@@ -2,13 +2,13 @@ pragma solidity ^0.4.24;
 
 import "ds-test/test.sol";
 import "ds-math/math.sol";
+import "ds-token/token.sol";
 import "./Base.sol";
-import "./IERC20.sol";
 
-contract BaseTest is DSTest {
+contract BaseTest is DSTest, DSMath {
     Base base;
-    IERC20 constant internal ETH_TOKEN_ADDRESS = IERC20(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
-    IERC20 constant internal WETH_TOKEN_ADDR = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
+    DSToken constant internal WETH_TOKEN_ADDR = DSToken(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     function setUp() public {
         base = new Base();
@@ -34,13 +34,26 @@ contract BaseTest is DSTest {
         // emit log_named_decimal_uint("wad_rate", rate, 18);
         assertTrue(rate == expectWadRate);
 
-        uint wad = base.toWad(srcAmnt, 18);
-        assertEq(wad, srcAmnt);
+        // uint wad = base.toWad(srcAmnt, 18);
+        // assertEq(wad, srcAmnt);
 
         uint expectCnyRate = 145613396432471787;
         rate = base.calcWadRate(destAmnt, srcAmnt);
         assertEq(rate, expectCnyRate);
 
+        // uint expectJpyRate = 8928571428571428; 进位了。
+        uint expectJpyRate = 8928571428571429;
+        rate = base.calcWadRate(112*srcAmnt, srcAmnt);
+        assertEq(rate, expectJpyRate);
+
+        uint usd2jpyRate = 112 * 10**18;
+        rate = base.calcWadRate(srcAmnt, 112*srcAmnt);
+        assertEq(rate, usd2jpyRate);
+
+        uint b = mul(sub(srcAmnt, 5*10**17), 10);
+        assertEq(b, 5*10**18);
+        uint d = wdiv(b, 10000*10**18); // 0.5 * 0.001
+        assertEq(d, 5*10**14); //0.0005
     }
 
 }

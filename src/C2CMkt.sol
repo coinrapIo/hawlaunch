@@ -3,6 +3,7 @@ pragma solidity ^0.4.24;
 import "ds-roles/roles.sol";
 import "ds-token/token.sol";
 import "./Base.sol";
+import "./CoinRapGatewayInterface.sol";
 import "./Set.sol";
 
 contract EventfulMarket{
@@ -11,17 +12,6 @@ contract EventfulMarket{
 
     event LogMake(
         uint indexed id,
-        bytes32 indexed pair,
-        address indexed maker,
-        DSToken           src,
-        DSToken           dest,
-        uint            srcAmnt,
-        uint            destAmnt,
-        uint64          timestamp
-    );
-
-    event LogBump(
-        uint    indexed id,
         bytes32 indexed pair,
         address indexed maker,
         DSToken           src,
@@ -55,15 +45,9 @@ contract EventfulMarket{
     );
 }
 
-contract BaseMarket is EventfulMarket, Base, DSRoles
+contract C2CMkt is EventfulMarket, Base, DSRoles
 {
     using SetLib for SetLib.Set;
-
-    struct UserBalance
-    {
-        uint srcBalance;
-        uint destBalance;
-    }
 
     struct OfferInfo
     {
@@ -84,17 +68,14 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
     }
 
     uint public lastOfferId;
+    address public gateway_cntrt;
     bool locked;
-    uint internal currRemit;
-    uint8 internal currFeeBps;
+    uint internal currRemit = 5 * 10 ** 17;
+    uint8 internal currFeeBps = 10;
     mapping(uint => OfferInfo) public offers;
     mapping(address => SetLib.Set) internal ownerOffers;
     mapping(address => bool) public listTokens;
     // mapping(address => uint) public nonces;
-    uint8 root_role = 0;  //power
-    uint8 admin_role = 1;
-    uint8 mod_role = 2;
-    uint8 user_role = 3;
 
     constructor(address admin, uint startsWith) DSAuth() public
     {
@@ -136,13 +117,6 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
         return listTokens[src] && listTokens[dest] && (src == ETH_TOKEN_ADDRESS || dest == ETH_TOKEN_ADDRESS);
     }
 
-
-    modifier canTake(uint id)
-    {
-        require(isActive(id), "the offer is not exists or inactivation!");
-        _;
-    }
-
     modifier canCancel(uint id)
     {
         require(isActive(id), "the offer is not exists or inactivation!");
@@ -159,9 +133,7 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
 
     modifier canMake(DSToken src, DSToken dest)
     {
-        require(listTokens[src], "It is not listed(src)");
-        require(listTokens[dest], "It is not listed(dest)");
-        require(src == ETH_TOKEN_ADDRESS || dest == ETH_TOKEN_ADDRESS, "The one must be etherum.");
+        require(isListPair(src, dest), "the tokens are not listed!");
         _;
     }
 
@@ -181,16 +153,15 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
 
     function update(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) public canUpdate(id) returns(bool)
     {
-        require(destAmnt > 0, "dest amount lte 0 or rate incorrect");
+        require(code>=0 && code < 9999, "incorrect code argument.");
         require((rngMin > 0 && rngMin <= rngMax && rngMax <= destAmnt), "incorrect range min~max arguments.");
         OfferInfo memory offer = offers[id];
         calcWadRate(offer.srcAmnt, destAmnt);
-        require(code>=0 || code < 9999, "incorrect code argument.");
         return _update(id, destAmnt, rngMin, rngMax, code);
 
     }
 
-    function _update(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) internal canUpdate(id) synchronized returns (bool)
+    function _update(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) internal synchronized returns (bool)
     {
         uint oldDestAmnt = offers[id].destAmnt;
         offers[id].destAmnt = destAmnt;
@@ -204,20 +175,16 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
     function cancel(uint id) public canCancel(id) returns(uint refund, uint fee)
     {
         require(offers[id].srcAmnt > 0, "balance wrong!");
-        UserBalance memory cntrtBefore;
-        UserBalance memory makerBefore;
-        cntrtBefore.srcBalance = getBalance(offers[id].src, this);
-        makerBefore.srcBalance = getBalance(offers[id].src, offers[id].owner);
+        uint cntrtBefore = getBalance(offers[id].src, this);
+        uint makerBefore = getBalance(offers[id].src, offers[id].owner);
         (refund, fee) = _cancel(id);
-        UserBalance memory cntrtAfter;
-        UserBalance memory makerAfter;
-        cntrtAfter.srcBalance = getBalance(offers[id].src, this);
-        makerAfter.srcBalance = getBalance(offers[id].src, offers[id].owner);
-        require(add(cntrtAfter.srcBalance, refund) == cntrtBefore.srcBalance, "src balance wrong(contract)");
-        require(add(makerBefore.srcBalance, refund) == makerAfter.srcBalance, "src balance wrong(maker)");
+        uint cntrtAfter = getBalance(offers[id].src, this);
+        uint makerAfter = getBalance(offers[id].src, offers[id].owner);
+        require(add(cntrtAfter, refund) == cntrtBefore, "src balance wrong(contract)");
+        require(add(makerBefore, refund) == makerAfter, "src balance wrong(maker)");
     }
 
-    function _cancel(uint id) internal canCancel(id) synchronized returns(uint refund, uint fee)
+    function _cancel(uint id) internal synchronized returns(uint refund, uint fee)
     {
 
         OfferInfo memory offer = offers[id];
@@ -238,75 +205,39 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
             require(offer.src.transfer(offer.owner, refund), "transfer to offer owner failed!");
             offers[id].srcAmnt = 0;
         }
+
         require(ownerOffers[offer.owner].remove(id), "remove owner offer failed!");
         delete offers[id];
+        
         bytes32 pair = keccak256(abi.encodePacked(offer.src, offer.dest));
         emit LogKill(id, pair, msg.sender, offer.src, offer.dest, offer.srcAmnt, offer.destAmnt, uint64(block.timestamp));
     }
 
-    function validateInput(uint id, DSToken tkDstTkn, uint destAmnt, uint16 code) internal view
+// uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate
+    function take(address taker, uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate) 
+        public payable returns (uint actualAmnt, uint fee)
     {
+        require(msg.sender == gateway_cntrt);
         require((tkDstTkn == ETH_TOKEN_ADDRESS || msg.value == 0), "The token of pay for or amount incorrect.");
-        
-        OfferInfo memory offer = offers[id];
-        require(offer.dest == tkDstTkn && (offer.code > 0 && offer.code == code), "The dest token or code is incorrect.");
-
-        uint amnt = (tkDstTkn == ETH_TOKEN_ADDRESS) ? msg.value : destAmnt;
-        require(offer.rngMin <= amnt && offer.rngMax >= amnt && amnt <= offer.destAmnt, "take amount does not in range.");
-    }
-
-    function take(uint id, DSToken tkDstTkn, uint destAmnt, uint16 code) public 
-        canTake(id) payable returns (uint actualAmnt, uint fee)
-    {
-        validateInput(id, tkDstTkn, destAmnt, code);
         OfferInfo memory offer = offers[id];
         uint amnt = (tkDstTkn == ETH_TOKEN_ADDRESS) ? msg.value : destAmnt;
         // rate settings by offer owner.
         uint rate = calcWadRate(offer.srcAmnt, offer.destAmnt); 
+        require(wad_min_rate <= rate, "the rate(taker expect) too higher");
         uint srcAmnt = calcSrcQty(amnt, getDecimalsSafe(offer.src), getDecimalsSafe(offer.dest), rate);
-        require((srcAmnt > 0), "rate settings incorrect.");
+        require(srcAmnt > 0 && srcAmnt <= getBalance(offer.src, this), "rate settings incorrect or contract balance insufficient");
 
-        UserBalance memory cntrtBefore;
-        cntrtBefore.srcBalance = getBalance(offer.src, this);
-        require(cntrtBefore.srcBalance >= srcAmnt, "insufficient funds in contract!");
+        (actualAmnt, fee) = _takeOffer(taker, id, tkDstTkn, amnt, srcAmnt);
 
-        UserBalance memory makerBefore;
-        UserBalance memory takerBefore;
-        makerBefore.destBalance = getBalance(offer.dest, offer.owner);
-        takerBefore.srcBalance = getBalance(offer.src, msg.sender);
-        takerBefore.destBalance = getBalance(offer.dest, msg.sender);
-
-        if (tkDstTkn != ETH_TOKEN_ADDRESS)
-        {
-            require(tkDstTkn.transferFrom(msg.sender, this, amnt), "can't transfer token from caller.");
-        }
-
-        (actualAmnt, fee) = _takeOffer(id, tkDstTkn, amnt, srcAmnt);
-
-        validAfterTrade(cntrtBefore, makerBefore, takerBefore, offer, amnt, actualAmnt, fee);
+        // bytes32 pair = keccak256(abi.encodePacked(offer.src, offer.dest));
+        // LogTake(id, pair, offer.owner, offer.src, offer.dest, taker, destAmnt, actualAmnt, uint64(block.timestamp));
 
     }
 
-    function validAfterTrade(
-        UserBalance cntrtBefore, UserBalance makerBefore, UserBalance takerBefore, 
-        OfferInfo offer, uint amnt, uint actualAmnt, uint fee) internal view
+    function _takeOffer(address taker, uint id, DSToken tkDstTkn, uint amnt, uint srcAmnt) 
+        internal synchronized returns (uint actualAmnt, uint fee)
     {
-        UserBalance memory cntrtAfter;
-        UserBalance memory makerAfter;
-        UserBalance memory takerAfter;
-        cntrtAfter.srcBalance = getBalance(offer.src, this);
-        makerAfter.destBalance = getBalance(offer.dest, offer.owner);
-        takerAfter.srcBalance = getBalance(offer.src, msg.sender);
-        takerAfter.destBalance = getBalance(offer.dest, msg.sender);
-
-        require(add(add(cntrtAfter.srcBalance, actualAmnt),fee) == cntrtBefore.srcBalance, "src balance wrong(contract)");
-        require(add(add(makerBefore.destBalance, actualAmnt),fee) == makerAfter.destBalance, "dest balance wrong(maker)");
-        require(add(takerAfter.destBalance, amnt) == takerBefore.destBalance, "dest balance wrong(taker)");
-        require(add(takerBefore.srcBalance, actualAmnt) == takerAfter.srcBalance, "src balance wrong(taker)");
-    }
-
-    function _takeOffer(uint id, DSToken tkDstTkn, uint amnt, uint srcAmnt) internal synchronized returns (uint actualAmnt, uint fee)
-    {
+        require(offers[id].destAmnt >= amnt, "the offer.destAmnt insufficient.");
         fee = 0;
         offers[id].srcAmnt = sub(offers[id].srcAmnt, srcAmnt);
         offers[id].destAmnt = sub(offers[id].destAmnt, amnt);
@@ -315,22 +246,23 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
             // maker's view: eth(src) -> token(dest)
             if (offers[id].accumTradeAmnt >= offers[id].remit)
             {
-                // srcAmnt * feeBps * 10000 / 10000
-                fee = wdiv(mul(srcAmnt, mul(offers[id].feeBps, 10000)), 10000);
+                // srcAmnt * feeBps / 10000
+                fee = wdiv(mul(srcAmnt, offers[id].feeBps), WAD_BPS);
                 offers[id].prepay = sub(offers[id].prepay, fee);
             }
             else
             {
-                if (offers[id].accumTradeAmnt + srcAmnt > offers[id].remit)
+                uint accum_amnt = add(offers[id].accumTradeAmnt, srcAmnt);
+                if ( accum_amnt > offers[id].remit)
                 {
-                    fee = offers[id].accumTradeAmnt + srcAmnt - offers[id].remit;
+                    fee = wdiv(mul(sub(accum_amnt, offers[id].remit), offers[id].feeBps), WAD_BPS);
                     offers[id].prepay = sub(offers[id].prepay, fee);
                 }
                 // else {} //free within the amount of remit.
             }
             offers[id].accumTradeAmnt = add(offers[id].accumTradeAmnt, srcAmnt);
             require(tkDstTkn.transfer(offers[id].owner, amnt), "transfer to offer's owner failed!");
-            msg.sender.transfer(srcAmnt);
+            taker.transfer(srcAmnt);
         }
         else
         {
@@ -338,22 +270,22 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
             uint offerOwnerAmnt = amnt;
             if (offers[id].accumTradeAmnt >= offers[id].remit)
             {
-                // amnt - (amnt * feeBps * 10000) / 1000
-                fee = wdiv(mul(amnt, mul(offers[id].feeBps, 10000)), 10000);
+                // amnt * feeBps / 10000
+                fee = wdiv(mul(amnt, offers[id].feeBps), WAD_BPS);
                 offerOwnerAmnt = sub(amnt, fee);
             }
             else
             {
-                if (offers[id].accumTradeAmnt + amnt > offers[id].remit)
+                uint accum_amnt2 = add(offers[id].accumTradeAmnt, amnt);
+                if ( accum_amnt2 > offers[id].remit)
                 {
-                    uint baseAmnt = sub(add(offers[id].accumTradeAmnt, amnt), offers[id].remit);
-                    fee = wdiv(mul(baseAmnt, mul(offers[id].feeBps, 10000)), 10000);
+                    fee = wdiv(mul(sub(accum_amnt2, offers[id].remit), offers[id].feeBps), WAD_BPS);
                     offerOwnerAmnt = sub(amnt, fee);
                 }
                 // else {} //free within the amount of remit.
             }
             offers[id].accumTradeAmnt = add(offers[id].accumTradeAmnt, amnt);
-            require(offers[id].src.transfer(msg.sender, srcAmnt), "transfer to caller failed!~");
+            require(offers[id].src.transfer(taker, srcAmnt), "transfer to taker failed!~");
             offers[id].owner.transfer(offerOwnerAmnt);
         }
         
@@ -367,52 +299,28 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
     }
 
 
-    function make(DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, uint rngMin, uint rngMax, uint prepayFee, uint16 code)
+    function make(address maker, DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, uint rngMin, uint rngMax, uint16 code)
         public canMake(src, dest) payable returns (uint id)
     {
-        require(src != dest, "There is same symbol in the trade pair?");
+        // require(msg.sender == gateway_cntrt);
+        require((code>=0 || code < 9999), "incorrect code argument.");
+        
         getDecimalsSafe(src);
         getDecimalsSafe(dest);
         require((src == ETH_TOKEN_ADDRESS || msg.value == 0),"incorrect payable arguments!");
+        uint prepay = 0;
         if (src == ETH_TOKEN_ADDRESS)
         {
-            require(srcAmnt + prepayFee <= msg.value && prepayFee >= (srcAmnt - currRemit) * currFeeBps, "argument value incorrect.(srcAmnt, prepayFee)");
+            prepay = wdiv(mul(sub(srcAmnt, currRemit), currFeeBps), WAD_BPS);
+            require(msg.value - srcAmnt == prepay, "argument value incorrect.(srcAmnt, prepay)");
         }
-        else
-        {
-            require(prepayFee == 0, "incorrect prepay fee");
-        }    
+         
         calcWadRate(srcAmnt, destAmnt);
-        require(srcAmnt > 0, "src amount lte 0");
-        require(destAmnt > 0, "dest amount lte 0 or rate incorrect");
-        require((rngMin > 0 && rngMin <= rngMax && rngMax <= destAmnt), "incorrect range min~max arguments.");
-        require((code>=0 || code < 9999), "incorrect code argument.");
-        
-
-        UserBalance memory makerBalanceBefore;
-        makerBalanceBefore.srcBalance = getBalance(src, msg.sender);
-        makerBalanceBefore.destBalance = getBalance(dest, msg.sender);
-
-        if (src == ETH_TOKEN_ADDRESS)
-        {
-            makerBalanceBefore.srcBalance = add(makerBalanceBefore.srcBalance, msg.value);
-        }
-        else
-        {
-            require(src.transferFrom(msg.sender, this, srcAmnt), "can't transfer token from msg.sender");
-        }
-
-        id = _makeOffer(src, srcAmnt, dest, destAmnt, rngMin, rngMax, code, prepayFee);
-        UserBalance memory userBalanceAfter;
-        userBalanceAfter.srcBalance = getBalance(src, msg.sender);
-        userBalanceAfter.destBalance = getBalance(dest, msg.sender);
-        
-        require(add(userBalanceAfter.srcBalance, msg.value) == makerBalanceBefore.srcBalance, "src balance check exception!");
-        require(userBalanceAfter.destBalance == makerBalanceBefore.destBalance, "dest balance check exception!");
+        id = _makeOffer(maker, src, srcAmnt, dest, destAmnt, rngMin, rngMax, code, prepay);
     }
 
 
-    function _makeOffer(DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, uint rngMin, uint rngMax, uint16 code, uint prepayFee) 
+    function _makeOffer(address maker, DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, uint rngMin, uint rngMax, uint16 code, uint prepayFee) 
         internal synchronized returns (uint id)
     {
         OfferInfo memory offer;
@@ -423,7 +331,7 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
         offer.rngMin = rngMin;
         offer.rngMax = rngMax;
         offer.code = code;
-        offer.owner = msg.sender;
+        offer.owner = maker;
         offer.timestamp = uint64(block.timestamp);
         offer.accumTradeAmnt = 0;
         offer.prepay = prepayFee;
@@ -433,13 +341,15 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
         
         offers[id] = offer;
         require(ownerOffers[offer.owner].add(id), "insert owner offer failed.");
+        
         bytes32 pair = keccak256(abi.encodePacked(src, dest));
         emit LogMake(id, pair, msg.sender, src, dest, srcAmnt, destAmnt, offer.timestamp);
     }
 
+    event DepositToken(ERC20 token, address from, uint amount);
     function () public payable
     {
-
+        emit DepositToken(ETH_TOKEN_ADDRESS, msg.sender, msg.value);
     }
 
     function getOffers(address owner) public view returns(uint[])
@@ -452,14 +362,28 @@ contract BaseMarket is EventfulMarket, Base, DSRoles
     {
         cnt = ownerOffers[owner].size();
     }
+    
+    function enabled() public view returns(bool)
+    {
+        return true;
+    }
+
 
     /**
      * admin ops.
      */
     function setToken(DSToken token, bool enable) public auth
     {
+        require(gateway_cntrt != address(0x00));
         require((enable && !listTokens[token]) || (!enable && listTokens[token]) , "token enable status wrong!");
         listTokens[token] = enable;
     }
+
+    function setCoinRapGateway(address gateway) public auth
+    {
+        require(gateway != address(0x00));
+        gateway_cntrt = gateway;
+    }
+
 
 }

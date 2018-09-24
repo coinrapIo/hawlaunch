@@ -1,20 +1,26 @@
 pragma solidity ^0.4.24;
 
 import "ds-math/math.sol";
-import "./IERC20.sol";
+import "ds-token/token.sol";
+// import "erc20/erc20.sol";
 
 contract Base is DSMath
 {
-    IERC20 constant internal ETH_TOKEN_ADDRESS = IERC20(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
+    DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
     uint  constant internal PRECISION = (10**18);
     uint  constant internal MAX_QTY   = (10**28); // 10B tokens
     uint  constant internal MAX_RATE  = (PRECISION * 10**6); // up to 1M tokens per ETH
     uint  constant internal MAX_DECIMALS = 18;
     uint  constant internal ETH_DECIMALS = 18;
+    uint constant internal WAD_BPS = (10**22);
     mapping(address=>uint) internal decimals;
 
+    uint8 root_role = 0;  //power
+    uint8 admin_role = 1;
+    uint8 mod_role = 2;
+    uint8 user_role = 3;
 
-    function getBalance(IERC20 token, address user) public view returns(uint) 
+    function getBalance(DSToken token, address user) public view returns(uint) 
     {
         if (token == ETH_TOKEN_ADDRESS)
             return user.balance;
@@ -22,18 +28,22 @@ contract Base is DSMath
             return token.balanceOf(user);
     }
 
-    function setDecimals(IERC20 token) internal {
-        if (token == ETH_TOKEN_ADDRESS) decimals[token] = ETH_DECIMALS;
-        else decimals[token] = token.decimals();
+    function setDecimals(DSToken token) internal 
+    {
+        if (token == ETH_TOKEN_ADDRESS)
+            decimals[token] = ETH_DECIMALS;
+        else 
+            decimals[token] = token.decimals();
     }
 
-    function getDecimals(IERC20 token) internal view returns(uint) {
+    function getDecimals(DSToken token) internal view returns(uint) {
         if (token == ETH_TOKEN_ADDRESS) return ETH_DECIMALS; // save storage access
         uint tokenDecimals = decimals[token];
         // technically, there might be token with decimals 0
         // moreover, very possible that old tokens have decimals 0
         // these tokens will just have higher gas fees.
-        if(tokenDecimals == 0) return token.decimals();
+        if(tokenDecimals == 0)
+            return token.decimals();
 
         return tokenDecimals;
     }
@@ -70,7 +80,7 @@ contract Base is DSMath
         return (numerator + denominator - 1) / denominator; //avoid rounding down errors
     }
 
-    function getDecimalsSafe(IERC20 token) internal returns(uint) 
+    function getDecimalsSafe(DSToken token) internal returns(uint) 
     {
         if (decimals[token] == 0) 
         {
@@ -79,11 +89,11 @@ contract Base is DSMath
         return decimals[token];
     }
 
-    function toWad(uint amnt, uint currDecimals) public pure returns(uint wad)
-    {
-        require(currDecimals <= MAX_DECIMALS);
-        wad = mul(amnt, 10 ** (MAX_DECIMALS-currDecimals));
-    }
+    // function toWad(uint amnt, uint currDecimals) public pure returns(uint wad)
+    // {
+    //     require(currDecimals <= MAX_DECIMALS);
+    //     wad = mul(amnt, 10 ** (MAX_DECIMALS-currDecimals));
+    // }
 
     function calcWadRate(uint srcAmnt, uint destAmnt) public pure returns(uint rate)
     {
@@ -131,6 +141,5 @@ contract Base is DSMath
         // }
         // return uint(rate1);
     }
-
 
 }
