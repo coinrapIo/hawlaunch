@@ -109,7 +109,7 @@ contract C2CMktTest is DSTest {
         uint16 code;
         // bool hasCode;
 
-        (, srcAmnt,  , destAmnt, owner, min, max, ,code ) = c2c.getOffer(id);
+        (, srcAmnt,  , destAmnt, owner, min, max, ,code, , ) = c2c.getOffer(id);
         // assertTrue(src == ETH_TOKEN_ADDRESS);
         // assertTrue(dest == crp);
         assertEq(srcAmnt, _srcAmnt);
