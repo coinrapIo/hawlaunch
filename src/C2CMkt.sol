@@ -8,7 +8,6 @@ import "./Set.sol";
 
 contract EventfulMarket{
     event LogOfferUpdate(uint id, uint oldDestAmnt, uint destAmnt, uint rngMin, uint rngMax);
-    event LogTrade(uint offer_id, address indexed taker, uint srcAmnt, address indexed src, uint destAmnt, address dest, int16 code);
 
     event LogMake(
         uint indexed id,
@@ -28,8 +27,8 @@ contract EventfulMarket{
         DSToken           src,
         DSToken           dest,
         address         taker,
-        uint            destAmnt,
-        uint            srcAmnt,
+        uint            actualAmnt,
+        uint            fee,
         uint64          timestamp
     );
 
@@ -45,7 +44,7 @@ contract EventfulMarket{
     );
 }
 
-contract C2CMkt is EventfulMarket, Base, DSRoles
+contract C2CMkt is EventfulMarket, Base, DSAuth
 {
     using SetLib for SetLib.Set;
 
@@ -70,8 +69,8 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
     uint public lastOfferId;
     address public gateway_cntrt;
     bool locked;
-    uint internal currRemit = 5 * 10 ** 17;
-    uint8 internal currFeeBps = 10;
+    uint public currRemit = 5 * 10 ** 17;
+    uint8 public currFeeBps = 10;
     mapping(uint => OfferInfo) public offers;
     mapping(address => SetLib.Set) internal ownerOffers;
     mapping(address => bool) public listTokens;
@@ -82,11 +81,11 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
         require(admin != address(0x0));
         lastOfferId = startsWith; //0x3e8; //starts with 1000
         listTokens[ETH_TOKEN_ADDRESS] = true;
-        setUserRole(msg.sender, root_role, true);
-        setUserRole(admin, admin_role, true);
+        // setUserRole(msg.sender, root_role, true);
+        // setUserRole(admin, admin_role, true);
 
         //mod ops
-        setRoleCapability(mod_role, this, bytes4(keccak256("setToken(address,bool)")), true);
+        // setRoleCapability(mod_role, this, bytes4(keccak256("setToken(address,bool)")), true);
     }
 
     
@@ -102,13 +101,15 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
 
     function getOffer(uint id) public view returns(
         DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, 
-        address owner, uint min, uint max, bool hasCode, uint16 code)
+        address owner, uint min, uint max, bool hasCode, uint16 code, 
+        uint prepay, uint accumEther)
     {
         OfferInfo memory offer = offers[id];
         uint16 c = msg.sender == offer.owner ? offer.code : 0;
         return(
             offer.src, offer.srcAmnt, offer.dest, offer.destAmnt,
-            offer.owner, offer.rngMin, offer.rngMax, offer.code==0, c
+            offer.owner, offer.rngMin, offer.rngMax, offer.code==0, c, 
+            offer.prepay, offer.accumTradeAmnt
         );
     }
 
@@ -188,25 +189,26 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
     {
 
         OfferInfo memory offer = offers[id];
-        refund = offer.srcAmnt;
+        //refund prepay and balance of offer, if the offer.src is ether.
+        refund = (offer.src == ETH_TOKEN_ADDRESS) ? add(offers[id].srcAmnt, offers[id].prepay) : offers[id].srcAmnt;
         fee = offer.prepay;
 
         if (offer.src == ETH_TOKEN_ADDRESS)
         {
-            //refund prepay and balance of offer
-            refund = add(offers[id].srcAmnt, offers[id].prepay);
             offer.owner.transfer(refund);
-            offers[id].srcAmnt = 0;
-            offers[id].prepay = 0;
         }
         else
         {
-            refund = offers[id].srcAmnt;
-            require(offer.src.transfer(offer.owner, refund), "transfer to offer owner failed!");
-            offers[id].srcAmnt = 0;
+            require(offer.src.transfer(offer.owner, refund), "transfer to offer owner failed!");   
         }
+        // offers[id].srcAmnt = 0;
+        // offers[id].prepay = 0;
 
         require(ownerOffers[offer.owner].remove(id), "remove owner offer failed!");
+        if (getOfferCnt(offer.owner) == 0)
+        {
+            delete ownerOffers[offer.owner];
+        }
         delete offers[id];
         
         bytes32 pair = keccak256(abi.encodePacked(offer.src, offer.dest));
@@ -223,24 +225,28 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
         uint amnt = (tkDstTkn == ETH_TOKEN_ADDRESS) ? msg.value : destAmnt;
         // rate settings by offer owner.
         uint rate = calcWadRate(offer.srcAmnt, offer.destAmnt); 
-        require(wad_min_rate <= rate, "the rate(taker expect) too higher");
+        require(wad_min_rate <= rate, "the rate(taker expect) too high");
         uint srcAmnt = calcSrcQty(amnt, getDecimalsSafe(offer.src), getDecimalsSafe(offer.dest), rate);
         require(srcAmnt > 0 && srcAmnt <= getBalance(offer.src, this), "rate settings incorrect or contract balance insufficient");
 
         (actualAmnt, fee) = _takeOffer(taker, id, tkDstTkn, amnt, srcAmnt);
 
-        // bytes32 pair = keccak256(abi.encodePacked(offer.src, offer.dest));
-        // LogTake(id, pair, offer.owner, offer.src, offer.dest, taker, destAmnt, actualAmnt, uint64(block.timestamp));
+        _logTake(id, offer.src, offer.dest, offer.owner, taker, actualAmnt, fee);
+    }
 
+    function _logTake(uint id, DSToken src, DSToken dest, address maker, address taker, uint actual_amnt, uint fee) internal
+    {
+        bytes32 pair = keccak256(abi.encodePacked(src, dest));
+        emit LogTake(id, pair, maker, src, dest, taker, actual_amnt, fee, uint64(block.timestamp));
     }
 
     function _takeOffer(address taker, uint id, DSToken tkDstTkn, uint amnt, uint srcAmnt) 
         internal synchronized returns (uint actualAmnt, uint fee)
     {
-        require(offers[id].destAmnt >= amnt, "the offer.destAmnt insufficient.");
         fee = 0;
         offers[id].srcAmnt = sub(offers[id].srcAmnt, srcAmnt);
         offers[id].destAmnt = sub(offers[id].destAmnt, amnt);
+        uint accum_amnt;
         if (tkDstTkn != ETH_TOKEN_ADDRESS)
         {
             // maker's view: eth(src) -> token(dest)
@@ -252,7 +258,7 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
             }
             else
             {
-                uint accum_amnt = add(offers[id].accumTradeAmnt, srcAmnt);
+                accum_amnt = add(offers[id].accumTradeAmnt, srcAmnt);
                 if ( accum_amnt > offers[id].remit)
                 {
                     fee = wdiv(mul(sub(accum_amnt, offers[id].remit), offers[id].feeBps), WAD_BPS);
@@ -276,10 +282,10 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
             }
             else
             {
-                uint accum_amnt2 = add(offers[id].accumTradeAmnt, amnt);
-                if ( accum_amnt2 > offers[id].remit)
+                accum_amnt = add(offers[id].accumTradeAmnt, amnt);
+                if ( accum_amnt > offers[id].remit)
                 {
-                    fee = wdiv(mul(sub(accum_amnt2, offers[id].remit), offers[id].feeBps), WAD_BPS);
+                    fee = wdiv(mul(sub(accum_amnt, offers[id].remit), offers[id].feeBps), WAD_BPS);
                     offerOwnerAmnt = sub(amnt, fee);
                 }
                 // else {} //free within the amount of remit.
@@ -292,6 +298,10 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
         if(offers[id].srcAmnt == 0)
         {
             require(ownerOffers[offers[id].owner].remove(id), "remove owner offer failed");
+            if (getOfferCnt(offers[id].owner) == 0)
+            {
+                delete ownerOffers[offers[id].owner];
+            }
             delete offers[id];
 
         }
@@ -303,7 +313,7 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
         public canMake(src, dest) payable returns (uint id)
     {
         // require(msg.sender == gateway_cntrt);
-        require((code>=0 || code < 9999), "incorrect code argument.");
+        require((code>=0 && code < 9999), "incorrect code argument.");
         
         getDecimalsSafe(src);
         getDecimalsSafe(dest);
@@ -357,6 +367,30 @@ contract C2CMkt is EventfulMarket, Base, DSRoles
         uint[] memory keys = ownerOffers[owner].getKeys();
         return keys;
     }
+
+    function getOfferByIds(uint[] ids) public view returns(
+        uint[], uint[], uint[], uint[]
+        )
+    {
+        // DSToken[] memory src = new DSToken[](ids.length);
+        uint[] memory src_amnt = new uint[](ids.length);
+        // DSToken[] memory dest = new DSToken[](ids.length);
+        uint[] memory dest_amnt = new uint[](ids.length);
+        // address[] memory owner = new address[](ids.length);
+        // uint[] memory rng_min = new uint[](ids.length);
+        // uint[] memory rng_max = new uint[](ids.length);
+        // bool[] memory has_code = new bool[](ids.length);
+        // uint16[] memory code = new uint16[](ids.length);
+        uint[] memory prepay = new uint[](ids.length);
+        uint[] memory accum = new uint[](ids.length);
+
+        for(uint i = 0; i < ids.length; i++)
+        {
+            (, src_amnt[i], , dest_amnt[i], , , , , , prepay[i],accum[i]) = getOffer(ids[i]);
+        }
+        return (src_amnt, dest_amnt,prepay, accum);
+    }
+    
 
     function getOfferCnt(address owner) public view returns(uint cnt)
     {

@@ -34,3 +34,23 @@ cd c2c_contract
 dapp test
 ```
 过程如果发生错误随时反馈。 可以在自己的代码和逻辑问题点，声明event, 然后在相关代码行emit事件查看。有必要时使用 dapp debug out/xxxxx.t.sol.json 进行调试。
+
+
+#### 部署rinkeby后的基本设置
+
+```
+# set c2c.gateway
+C2C=0x04C5809C427C1Bb0B7cceb401e99772e8175777b
+GATEWAY=0xB486756F28Bf3E2D3B030Ce1172f0d1DD06a5d41
+seth send $C2C "setCoinRapGateway(address)" $GATEWAY
+
+# set c2c.listed tokens
+MESH=0x04C5809C427C1Bb0B7cceb401e99772e8175777b
+seth send $C2C "setToken(address,bool)" $MESH true
+
+
+# set gateway.c2c
+seth send $GATEWAY "set_c2c_mkt(address)" $C2C
+
+
+```
