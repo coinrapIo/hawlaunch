@@ -50,9 +50,9 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
 
     struct OfferInfo
     {
-        DSToken           src;
+        DSToken         src;
         uint            srcAmnt;
-        DSToken           dest;
+        DSToken         dest;
         uint            destAmnt;
         address         owner;
         uint            rngMin;
@@ -312,7 +312,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
     function make(address maker, DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, uint rngMin, uint rngMax, uint16 code)
         public canMake(src, dest) payable returns (uint id)
     {
-        // require(msg.sender == gateway_cntrt);
+        require(msg.sender == gateway_cntrt);
         require((code>=0 && code < 9999), "incorrect code argument.");
         
         getDecimalsSafe(src);
@@ -321,7 +321,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         uint prepay = 0;
         if (src == ETH_TOKEN_ADDRESS)
         {
-            prepay = wdiv(mul(sub(srcAmnt, currRemit), currFeeBps), WAD_BPS);
+            prepay = (currRemit >= srcAmnt) ? 0 : wdiv(mul(sub(srcAmnt, currRemit), currFeeBps), WAD_BPS);
             require(msg.value - srcAmnt == prepay, "argument value incorrect.(srcAmnt, prepay)");
         }
          
