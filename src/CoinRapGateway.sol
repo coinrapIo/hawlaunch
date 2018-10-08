@@ -203,9 +203,8 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         address o_owner;
         uint o_min;
         uint o_max;
-        uint o_code;
-        (o_src, , o_dest, o_dest_amnt, o_owner, o_min, o_max, , o_code,,) = c2c.getOffer(id);
-        require(src == o_src && dest == o_dest && (o_code == 0 || code == o_code));
+        (o_src, , o_dest, o_dest_amnt, o_owner, o_min, o_max, , , ) = c2c.getOffer(id);
+        require(src == o_src && dest == o_dest);
         uint amnt = (dest == ETH_TOKEN_ADDRESS) ? msg.value : dest_amnt;
         require(amnt >= o_min && amnt <= o_max && amnt <= o_dest_amnt);
     }
