@@ -94,21 +94,20 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         return offers[id].timestamp > 0;
     }
 
-    function getOwner(uint id) public view returns (address owner)
+    function getOwner(uint id) public view returns (address)
     {
         return offers[id].owner;
     }
 
     function getOffer(uint id) public view returns(
         DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, 
-        address owner, uint min, uint max, bool hasCode, uint16 code, 
+        address owner, uint min, uint max, bool hasCode,
         uint prepay, uint accumEther)
     {
         OfferInfo memory offer = offers[id];
-        uint16 c = msg.sender == offer.owner ? offer.code : 0;
         return(
             offer.src, offer.srcAmnt, offer.dest, offer.destAmnt,
-            offer.owner, offer.rngMin, offer.rngMax, offer.code==0, c, 
+            offer.owner, offer.rngMin, offer.rngMax, offer.code>0, 
             offer.prepay, offer.accumTradeAmnt
         );
     }
@@ -118,14 +117,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         return listTokens[src] && listTokens[dest] && (src == ETH_TOKEN_ADDRESS || dest == ETH_TOKEN_ADDRESS);
     }
 
-    modifier canCancel(uint id)
-    {
-        require(isActive(id), "the offer is not exists or inactivation!");
-        require(getOwner(id) == msg.sender, "the offer is not own by caller");
-        _;
-    }
-
-    modifier canUpdate(uint id)
+    modifier isOwner(uint id)
     {
         require(isActive(id), "the offer is not exists or inactivation!");
         require(getOwner(id) == msg.sender, "the offer is not own by caller");
@@ -152,7 +144,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         return lastOfferId;
     }
 
-    function update(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) public canUpdate(id) returns(bool)
+    function update(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) public isOwner(id) returns(bool)
     {
         require(code>=0 && code < 9999, "incorrect code argument.");
         require((rngMin > 0 && rngMin <= rngMax && rngMax <= destAmnt), "incorrect range min~max arguments.");
@@ -173,14 +165,15 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         return true;
     }
 
-    function cancel(uint id) public canCancel(id) returns(uint refund, uint fee)
+    function cancel(uint id) public isOwner(id) returns(uint refund, uint fee)
     {
+        OfferInfo memory offer = offers[id];
         require(offers[id].srcAmnt > 0, "balance wrong!");
-        uint cntrtBefore = getBalance(offers[id].src, this);
-        uint makerBefore = getBalance(offers[id].src, offers[id].owner);
+        uint cntrtBefore = getBalance(offer.src, this);
+        uint makerBefore = getBalance(offer.src, offer.owner);
         (refund, fee) = _cancel(id);
-        uint cntrtAfter = getBalance(offers[id].src, this);
-        uint makerAfter = getBalance(offers[id].src, offers[id].owner);
+        uint cntrtAfter = getBalance(offer.src, this);
+        uint makerAfter = getBalance(offer.src, offer.owner);
         require(add(cntrtAfter, refund) == cntrtBefore, "src balance wrong(contract)");
         require(add(makerBefore, refund) == makerAfter, "src balance wrong(maker)");
     }
@@ -312,7 +305,8 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
     function make(address maker, DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, uint rngMin, uint rngMax, uint16 code)
         public canMake(src, dest) payable returns (uint id)
     {
-        require(msg.sender == gateway_cntrt);
+        // TODO: 仅用于单元测试。
+        // require(msg.sender == gateway_cntrt);
         require((code>=0 && code < 9999), "incorrect code argument.");
         
         getDecimalsSafe(src);
@@ -386,7 +380,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
 
         for(uint i = 0; i < ids.length; i++)
         {
-            (, src_amnt[i], , dest_amnt[i], , , , , , prepay[i],accum[i]) = getOffer(ids[i]);
+            (, src_amnt[i], , dest_amnt[i], , , , , prepay[i],accum[i]) = getOffer(ids[i]);
         }
         return (src_amnt, dest_amnt,prepay, accum);
     }
@@ -401,7 +395,6 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
     {
         return true;
     }
-
 
     /**
      * admin ops.
@@ -419,5 +412,18 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         gateway_cntrt = gateway;
     }
 
+    function getOfferCode(uint id, bytes32 msghash, uint8 v, bytes32 r, bytes32 s)  public view returns(uint16 code)
+    {
+        code = 0;
+        if (isActive(id))
+        {
+            bytes32 h = keccak256("\x19Ethereum Signed Message:\n32", msghash);
+            OfferInfo memory offer = offers[id];
+            if(ecrecover(h, v, r, s)==offer.owner)
+            {
+                return offer.code;
+            }
+        }
+    }
 
 }

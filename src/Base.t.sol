@@ -33,6 +33,8 @@ contract BaseTest is DSTest, DSMath {
         uint rate = base.calcWadRate(srcAmnt, destAmnt);
         // emit log_named_decimal_uint("wad_rate", rate, 18);
         assertTrue(rate == expectWadRate);
+        uint xxx = 1000001;
+        assertEq(keccak256(xxx), bytes32(0x36ecb80179110832e824753e57dc855c5275c1774c7b3a3701dad1c1de452d1a));
 
         // uint wad = base.toWad(srcAmnt, 18);
         // assertEq(wad, srcAmnt);

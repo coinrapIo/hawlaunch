@@ -75,6 +75,15 @@ contract C2CMktTest is DSTest {
         // assertTrue(code == _code);
         assertEq(c2c.getOfferCnt(this), 1);
         assertTrue(c2c.isActive(id));
+        assertEq(c2c.getOwner(id), address(this));
+        // uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code
+        c2c.update(id, _destAmnt, _min, _max, 0);
+        uint amnt;
+        uint fee;
+        (amnt, fee) = c2c.cancel(id);
+        assertEq(amnt -_fee, _srcAmnt);
+        assertEq(fee, _fee);
+
     }
 
     function test_make_take() public
@@ -91,10 +100,12 @@ contract C2CMktTest is DSTest {
         uint id = c2c.make.value(_srcAmnt+_fee)(user1, ETH_TOKEN_ADDRESS, _srcAmnt, crp, _destAmnt, _min, _max, _code);
         assertEq(id, startsWith+1);
         assertEq(crp.balanceOf(this), initialBalance);
-        crp.approve(address(gateway));
-        (_destAmnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, 500*10**18, 1000*10**18, 1234);
+        crp.approve(address(gateway), 2**255);
+        (_destAmnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, 500*10**18, 1000*10**18, _code);
+        assertEq(crp.balanceOf(this), 500*10**18);
         assertEq(_destAmnt, 5*10**17);
         assertEq(_fee, 0);
+        
     }
 
     function validate_offer(uint id, DSToken _src, uint _srcAmnt, DSToken _dest, uint _destAmnt, uint _min, uint _max, uint16 _code) internal
@@ -106,10 +117,10 @@ contract C2CMktTest is DSTest {
         uint min;
         uint max;
         address owner;
-        uint16 code;
+        // uint16 code;
         // bool hasCode;
 
-        (, srcAmnt,  , destAmnt, owner, min, max, ,code, , ) = c2c.getOffer(id);
+        (, srcAmnt,  , destAmnt, owner, min, max, , , ) = c2c.getOffer(id);
         // assertTrue(src == ETH_TOKEN_ADDRESS);
         // assertTrue(dest == crp);
         assertEq(srcAmnt, _srcAmnt);
@@ -118,7 +129,7 @@ contract C2CMktTest is DSTest {
         assertEq(min, _min);
         assertEq(max, _max);
         // assertTrue(hasCode == (_code > 0));
-        assertTrue(code == _code);
+        // assertTrue(code == _code);
     }
 
     function test_take() public

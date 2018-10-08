@@ -36,17 +36,31 @@ dapp test
 过程如果发生错误随时反馈。 可以在自己的代码和逻辑问题点，声明event, 然后在相关代码行emit事件查看。有必要时使用 dapp debug out/xxxxx.t.sol.json 进行调试。
 
 
-#### 部署rinkeby后的基本设置
+#### 部署kovan后的基本设置
+
+~/.sethrc 文件配置如下
 
 ```
+export SETH_CHAIN=kovan
+export ETH_FROM=897eeaF88F2541Df86D61065e34e7Ba13C111CB8
+export ETH_KEYSTORE=/home/dust/.ethereum/keystore
+export ETH_RPC_URL=https://kovan.infura.io/v3/7f64cd98c4f14db1bd868b7e1a57649e
+```
+
+其中keystore文件替换成自己能控制的,或者联系我获得.
+
+
+kovan:
+C2C=0xdeae4db689093ca82620bd2119b1443c9de68898
+```
 # set c2c.gateway
-C2C=0x04C5809C427C1Bb0B7cceb401e99772e8175777b
-GATEWAY=0xB486756F28Bf3E2D3B030Ce1172f0d1DD06a5d41
+C2C=0xdeae4db689093ca82620bd2119b1443c9de68898
+GATEWAY=0x38c954484DB87CD23369d616218dabBf57D29FBf
 seth send $C2C "setCoinRapGateway(address)" $GATEWAY
 
 # set c2c.listed tokens
-MESH=0x04C5809C427C1Bb0B7cceb401e99772e8175777b
-seth send $C2C "setToken(address,bool)" $MESH true
+SMT=0xa03D360215C62afD2d324aaBda422B92d78b7684
+seth send $C2C "setToken(address,bool)" $SMT true
 
 
 # set gateway.c2c
