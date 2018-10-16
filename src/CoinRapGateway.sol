@@ -186,8 +186,8 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         taker_after.srcBalance = getBalance(src, msg.sender);
         taker_after.destBalance = getBalance(dest, msg.sender);
         // emit LogBalance(o_owner, maker_before.destBalance, maker_after.destBalance, actual_amnt, fee);
-
-        require(add(add(cntrt_after.srcBalance, actual_amnt),fee) == cntrt_before.srcBalance, "src balance wrong(contract)");
+        
+        require(add(cntrt_after.srcBalance, actual_amnt) == cntrt_before.srcBalance, "src balance wrong(contract)");
         require(sub(add(maker_before.destBalance, dest_amnt),fee) == maker_after.destBalance, "dest balance wrong(maker)");
         require(add(taker_after.destBalance, dest_amnt) == taker_before.destBalance, "dest balance wrong(taker)");
         require(add(taker_before.srcBalance, actual_amnt) == taker_after.srcBalance, "src balance wrong(taker)");

@@ -48,39 +48,29 @@ contract Base is DSMath
         return tokenDecimals;
     }
 
-    function calcDstQty(uint srcQty, uint srcDecimals, uint dstDecimals, uint rate) internal pure returns(uint) {
-        require(srcQty <= MAX_QTY);
-        require(rate <= MAX_RATE);
-
-        if (dstDecimals >= srcDecimals) {
-            require((dstDecimals - srcDecimals) <= MAX_DECIMALS);
-            return (srcQty * rate * (10**(dstDecimals - srcDecimals))) / PRECISION;
-        } else {
-            require((srcDecimals - dstDecimals) <= MAX_DECIMALS);
-            return (srcQty * rate) / (PRECISION * (10**(srcDecimals - dstDecimals)));
-        }
-    }
-
-    function calcSrcQty(uint dstQty, uint srcDecimals, uint dstDecimals, uint rate) internal pure returns(uint) {
+    function calcSrcQty(uint dstQty, uint srcDecimals, uint dstDecimals, uint rate) public pure returns(uint) {
         require(dstQty <= MAX_QTY);
         require(rate <= MAX_RATE);
+        require(srcDecimals % 2 == 0);
         
         //source quantity is rounded up. to avoid dest quantity being too low.
         uint numerator;
         uint denominator;
         if (srcDecimals >= dstDecimals) {
             require((srcDecimals - dstDecimals) <= MAX_DECIMALS);
-            numerator = (PRECISION * dstQty * (10**(srcDecimals - dstDecimals)));
-            denominator = rate;
+            numerator = (dstQty * (10**(srcDecimals - dstDecimals)));
+            denominator = rate * (10**(srcDecimals/2));
+            return wdiv(numerator, denominator);
         } else {
             require((dstDecimals - srcDecimals) <= MAX_DECIMALS);
-            numerator = (PRECISION * dstQty);
-            denominator = (rate * (10**(dstDecimals - srcDecimals)));
+            numerator = dstQty ;
+            denominator = rate  * (10**(dstDecimals - srcDecimals + srcDecimals/2));
+            return wdiv(numerator, denominator);
         }
-        return (numerator + denominator - 1) / denominator; //avoid rounding down errors
+        // return (numerator + denominator - 1) / denominator; //avoid rounding down errors
     }
 
-    function getDecimalsSafe(DSToken token) internal returns(uint) 
+    function getDecimalsSafe(DSToken token) public returns(uint) 
     {
         if (decimals[token] == 0) 
         {
@@ -89,15 +79,10 @@ contract Base is DSMath
         return decimals[token];
     }
 
-    // function toWad(uint amnt, uint currDecimals) public pure returns(uint wad)
-    // {
-    //     require(currDecimals <= MAX_DECIMALS);
-    //     wad = mul(amnt, 10 ** (MAX_DECIMALS-currDecimals));
-    // }
-
-    function calcWadRate(uint srcAmnt, uint destAmnt) public pure returns(uint rate)
+    function calcWadRate(uint srcAmnt, uint destAmnt, uint srcDecimals) public pure returns(uint rate)
     {
-        rate = wdiv(destAmnt, srcAmnt);
+        require(srcDecimals % 2 == 0);
+        rate = wdiv(destAmnt, mul(srcAmnt, 10**(srcDecimals/2)));
         require(rate > 0 && rate < MAX_RATE, "incorrect rate!");
     }
 

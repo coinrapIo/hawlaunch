@@ -105,11 +105,16 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         uint prepay, uint accumEther)
     {
         OfferInfo memory offer = offers[id];
-        return(
-            offer.src, offer.srcAmnt, offer.dest, offer.destAmnt,
-            offer.owner, offer.rngMin, offer.rngMax, offer.code>0, 
-            offer.prepay, offer.accumTradeAmnt
-        );
+        src = offer.src;
+        srcAmnt = offer.srcAmnt;
+        dest = offer.dest;
+        destAmnt = offer.destAmnt;
+        owner = offer.owner;
+        min = offer.rngMin;
+        max = offer.rngMax;
+        hasCode = (offer.code>uint16(0));
+        prepay = offer.prepay;
+        accumEther = offer.accumTradeAmnt;
     }
 
     function isListPair(DSToken src, DSToken dest) public view returns(bool)
@@ -149,7 +154,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         require(code>=0 && code < 9999, "incorrect code argument.");
         require((rngMin > 0 && rngMin <= rngMax && rngMax <= destAmnt), "incorrect range min~max arguments.");
         OfferInfo memory offer = offers[id];
-        calcWadRate(offer.srcAmnt, destAmnt);
+        calcWadRate(offer.srcAmnt, destAmnt, getDecimalsSafe(offer.src));
         return _update(id, destAmnt, rngMin, rngMax, code);
 
     }
@@ -217,7 +222,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         OfferInfo memory offer = offers[id];
         uint amnt = (tkDstTkn == ETH_TOKEN_ADDRESS) ? msg.value : destAmnt;
         // rate settings by offer owner.
-        uint rate = calcWadRate(offer.srcAmnt, offer.destAmnt); 
+        uint rate = calcWadRate(offer.srcAmnt, offer.destAmnt, getDecimalsSafe(offer.src)); 
         require(wad_min_rate <= rate, "the rate(taker expect) too high");
         uint srcAmnt = calcSrcQty(amnt, getDecimalsSafe(offer.src), getDecimalsSafe(offer.dest), rate);
         require(srcAmnt > 0 && srcAmnt <= getBalance(offer.src, this), "rate settings incorrect or contract balance insufficient");
@@ -319,7 +324,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
             require(msg.value - srcAmnt == prepay, "argument value incorrect.(srcAmnt, prepay)");
         }
          
-        calcWadRate(srcAmnt, destAmnt);
+        calcWadRate(srcAmnt, destAmnt, getDecimalsSafe(src));
         id = _makeOffer(maker, src, srcAmnt, dest, destAmnt, rngMin, rngMax, code, prepay);
     }
 
@@ -421,7 +426,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
             OfferInfo memory offer = offers[id];
             if(ecrecover(h, v, r, s)==offer.owner)
             {
-                return offer.code;
+                code = offer.code;
             }
         }
     }
