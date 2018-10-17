@@ -13,6 +13,7 @@ contract C2CMktTest is DSTest {
     CoinRapGateway gateway;
     uint startsWith = 0;
     uint initialBalance = 100000 * 10 ** 18;
+    uint user1CrpAmnt = 10000*10**18;
     DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
     DSToken constant internal WETH_TOKEN_ADDR = DSToken(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address user1 = address(0x897eeaF88F2541Df86D61065e34e7Ba13C111CB8);
@@ -31,7 +32,7 @@ contract C2CMktTest is DSTest {
         crp.mint(initialBalance);
 
         user1.transfer(5*10**18);  // test -5eth-> user1
-        crp.transfer(user1, 10000*10**18); //
+        crp.transfer(user1, user1CrpAmnt); //
     }
 
     function () public payable
@@ -101,10 +102,10 @@ contract C2CMktTest is DSTest {
         // uint prepay, uint rng_min, uint rng_max, uint16 code, bytes ref
         uint id = c2c.make.value(_srcAmnt+_fee)(user1, ETH_TOKEN_ADDRESS, _srcAmnt, crp, _destAmnt, _min, _max, _code);
         assertEq(id, startsWith+1);
-        assertEq(crp.balanceOf(this), initialBalance);
-        crp.approve(address(gateway), 2**255);
+        assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt);
+        assertTrue(crp.approve(address(gateway), 2**255));
         (_destAmnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, 500*10**18, 1000*10**9, _code);
-        // assertEq(crp.balanceOf(this), 500*10**18);
+        assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt-500*10**18);
         assertEq(_destAmnt, 5*10**17);
         assertEq(_fee, 0);
         
@@ -123,12 +124,16 @@ contract C2CMktTest is DSTest {
         assertEq(rate, 10**6);
 
         crp.approve(address(gateway), 2**255);
-        uint id = gateway.make.value(0)(crp, _src_amnt, ETH_TOKEN_ADDRESS, _dest_amnt, _min, _max, _code);
+        // uint id = gateway.make.value(0)(crp, _src_amnt, ETH_TOKEN_ADDRESS, _dest_amnt, _min, _max, _code);
+        crp.transfer(c2c, _src_amnt);
+        uint id = c2c.make.value(0)(user1, crp, _src_amnt, ETH_TOKEN_ADDRESS, _dest_amnt, _min, _max, _code);
         assertEq(_src_amnt, crp.balanceOf(c2c));
         assertEq(id, startsWith+1);
+        
         (_dest_amnt, _fee) = gateway.take.value(5*10**17)(id, crp, ETH_TOKEN_ADDRESS, 5*10**17, 10**6, _code);
         assertEq(_dest_amnt, 500*10**18);
         assertEq(_fee, 0);
+        
 
     }
 
