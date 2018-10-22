@@ -85,11 +85,6 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         require(admin != address(0x0));
         lastOfferId = startsWith; //0x3e8; //starts with 1000
         listTokens[ETH_TOKEN_ADDRESS] = true;
-        // setUserRole(msg.sender, root_role, true);
-        // setUserRole(admin, admin_role, true);
-
-        //mod ops
-        // setRoleCapability(mod_role, this, bytes4(keccak256("setToken(address,bool)")), true);
     }
 
     
@@ -158,7 +153,8 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         require(code>=0 && code < 9999, "incorrect code argument.");
         require((rngMin > 0 && rngMin <= rngMax && rngMax <= destAmnt), "incorrect range min~max arguments.");
         OfferInfo memory offer = offers[id];
-        calcWadRate(offer.srcAmnt, destAmnt, getDecimalsSafe(offer.src));
+        uint rate = calcWadRate(offer.srcAmnt, destAmnt, getDecimalsSafe(offer.src));
+        require(offer.srcAmnt == calcSrcQty(destAmnt, getDecimalsSafe(offer.src), getDecimalsSafe(offer.dest), rate));
         return _update(id, destAmnt, rngMin, rngMax, code);
 
     }
