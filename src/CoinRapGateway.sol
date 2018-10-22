@@ -152,7 +152,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         before.maker.destBalance = getBalance(dest, o_owner);
         before.taker.srcBalance = getBalance(src, msg.sender);
         before.taker.destBalance = getBalance(dest, msg.sender);
-        emit LogBalance(msg.sender, before.cntrt.srcBalance, before.maker.destBalance, before.taker.srcBalance, before.taker.destBalance);
+        // emit LogBalance(msg.sender, before.cntrt.srcBalance, before.maker.destBalance, before.taker.srcBalance, before.taker.destBalance);
         
 
         if (dest != ETH_TOKEN_ADDRESS)
@@ -171,8 +171,8 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         aft.maker.destBalance = getBalance(dest, o_owner);
         aft.taker.srcBalance = getBalance(src, msg.sender);
         aft.taker.destBalance = getBalance(dest, msg.sender);
-        emit LogBalance(msg.sender, before.cntrt.srcBalance, before.maker.destBalance, before.taker.srcBalance, before.taker.destBalance);
-        emit LogBalance(o_owner, aft.cntrt.srcBalance, aft.maker.destBalance, aft.taker.srcBalance, aft.taker.destBalance);
+        // emit LogBalance(msg.sender, before.cntrt.srcBalance, before.maker.destBalance, before.taker.srcBalance, before.taker.destBalance);
+        // emit LogBalance(o_owner, aft.cntrt.srcBalance, aft.maker.destBalance, aft.taker.srcBalance, aft.taker.destBalance);
         
         require(sub(before.cntrt.srcBalance, actual_amnt) == aft.cntrt.srcBalance, "src balance wrong(contract)");
         require(sub(add(before.maker.destBalance, dest_amnt),fee) == aft.maker.destBalance, "dest balance wrong(maker)");
@@ -180,24 +180,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         require(sub(before.taker.destBalance, dest_amnt) == aft.taker.destBalance, "dest balance wrong(taker)");
     }
 
-    event LogBalance(address addr, uint before, uint aft, uint amunt, uint fee);
-
-    function validate_after_take(DSToken src, DSToken dest, uint dest_amnt, address o_owner, uint actual_amnt, uint fee, UserBalance taker_before, UserBalance maker_before, UserBalance cntrt_before) internal {
-        UserBalance memory cntrt_after;
-        UserBalance memory maker_after;
-        UserBalance memory taker_after;
-        cntrt_after.srcBalance = getBalance(src, c2c);
-        maker_after.destBalance = getBalance(dest, o_owner);
-        taker_after.srcBalance = getBalance(src, msg.sender);
-        taker_after.destBalance = getBalance(dest, msg.sender);
-        emit LogBalance(msg.sender, cntrt_before.srcBalance, maker_before.destBalance, taker_before.srcBalance, taker_before.destBalance);
-        emit LogBalance(o_owner, cntrt_after.srcBalance, maker_after.destBalance, taker_after.srcBalance, taker_after.destBalance);
-        
-        // require(add(cntrt_after.srcBalance, actual_amnt) == cntrt_before.srcBalance, "src balance wrong(contract)");
-        // require(sub(add(maker_before.destBalance, dest_amnt),fee) == maker_after.destBalance, "dest balance wrong(maker)");
-        // require(add(taker_before.srcBalance, actual_amnt) == taker_after.srcBalance, "src balance wrong(taker)");
-        // require(sub(taker_before.destBalance, dest_amnt) == taker_after.destBalance, "dest balance wrong(taker)");
-    }
+    // event LogBalance(address addr, uint before, uint aft, uint amunt, uint fee);
 
     function validate_take_input(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code) internal view 
     {
@@ -210,14 +193,18 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         uint o_min;
         uint o_max;
         (o_src, , o_dest, o_dest_amnt, o_owner, o_min, o_max, , , ) = c2c.getOffer(id);
+        if (o_dest_amnt < o_min)
+        {
+            o_min = o_dest_amnt;
+        }
         require(src == o_src && dest == o_dest);
         uint amnt = (dest == ETH_TOKEN_ADDRESS) ? msg.value : dest_amnt;
         require(amnt >= o_min && amnt <= o_max && amnt <= o_dest_amnt);
     }
     
     function trade(
-        DSToken src, uint src_amnt, DSToken dest, address dest_addr, uint max_dest_amnt, uint min_rate, 
-        uint rate100, uint sn, bytes32 code
+        DSToken src, uint src_amnt, DSToken dest, address dest_addr, uint max_dest_amnt, 
+        uint min_rate, uint rate100, uint sn, bytes32 code
     ) public payable returns (uint)
     {
         if(swap == address(0x00))

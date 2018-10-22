@@ -13,8 +13,8 @@ contract EventfulMarket{
         uint indexed id,
         bytes32 indexed pair,
         address indexed maker,
-        DSToken           src,
-        DSToken           dest,
+        DSToken         src,
+        DSToken         dest,
         uint            srcAmnt,
         uint            destAmnt,
         uint64          timestamp
@@ -24,8 +24,8 @@ contract EventfulMarket{
         uint    indexed id,
         bytes32 indexed pair,
         address indexed maker,
-        DSToken           src,
-        DSToken           dest,
+        DSToken         src,
+        DSToken         dest,
         address         taker,
         uint            actualAmnt,
         uint            fee,
@@ -36,8 +36,8 @@ contract EventfulMarket{
         uint    indexed id,
         bytes32 indexed pair,
         address indexed maker,
-        DSToken           src,
-        DSToken           dest,
+        DSToken         src,
+        DSToken         dest,
         uint            srcAmnt,
         uint            destAmnt,
         uint64          timestamp
@@ -74,7 +74,11 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
     mapping(uint => OfferInfo) public offers;
     mapping(address => SetLib.Set) internal ownerOffers;
     mapping(address => bool) public listTokens;
-    // mapping(address => uint) public nonces;
+    //token:balance, hold by offer owner
+    mapping(address => uint256) public balanceInOrder;
+    bool public enableMake = true;
+    // sha3(token,address) => bool
+    mapping(bytes32 => bool) withdrawAddresses;
 
     constructor(address admin, uint startsWith) DSAuth() public
     {
@@ -131,7 +135,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
 
     modifier canMake(DSToken src, DSToken dest)
     {
-        require(isListPair(src, dest), "the tokens are not listed!");
+        require(isListPair(src, dest) && enableMake, "the tokens are not listed!");
         _;
     }
 
@@ -199,6 +203,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         {
             require(offer.src.transfer(offer.owner, refund), "transfer to offer owner failed!");   
         }
+        balanceInOrder[offer.src] = sub(balanceInOrder[offer.src], refund);
         // offers[id].srcAmnt = 0;
         // offers[id].prepay = 0;
 
@@ -225,6 +230,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         fee = 0;
         offers[id].srcAmnt = sub(offers[id].srcAmnt, srcAmnt);
         offers[id].destAmnt = sub(offers[id].destAmnt, amnt);
+        balanceInOrder[offers[id].src] = sub(balanceInOrder[offers[id].src], srcAmnt);
         uint accum_amnt;
         if (tkDstTkn != ETH_TOKEN_ADDRESS)
         {
@@ -234,6 +240,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
                 // srcAmnt * feeBps / 10000
                 fee = wdiv(mul(srcAmnt, offers[id].feeBps), WAD_BPS);
                 offers[id].prepay = sub(offers[id].prepay, fee);
+                balanceInOrder[offers[id].src] = sub(balanceInOrder[offers[id].src], fee);
             }
             else
             {
@@ -242,6 +249,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
                 {
                     fee = wdiv(mul(sub(accum_amnt, offers[id].remit), offers[id].feeBps), WAD_BPS);
                     offers[id].prepay = sub(offers[id].prepay, fee);
+                    balanceInOrder[offers[id].src] = sub(balanceInOrder[offers[id].src], fee);
                 }
                 // else {} //free within the amount of remit.
             }
@@ -305,7 +313,8 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
             require(msg.value - srcAmnt == prepay, "argument value incorrect.(srcAmnt, prepay)");
         }
          
-        calcWadRate(srcAmnt, destAmnt, getDecimalsSafe(src));
+        uint rate = calcWadRate(srcAmnt, destAmnt, getDecimalsSafe(src));
+        require(srcAmnt == calcSrcQty(destAmnt, getDecimalsSafe(src), getDecimalsSafe(dest), rate));
         id = _makeOffer(maker, src, srcAmnt, dest, destAmnt, rngMin, rngMax, code, prepay);
     }
 
@@ -348,6 +357,11 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         id = _nextId();
         
         offers[id] = offer;
+        balanceInOrder[src] = add(balanceInOrder[src], srcAmnt);
+        if (src == ETH_TOKEN_ADDRESS && prepayFee > 0)
+        {
+            balanceInOrder[src] = add(balanceInOrder[src], prepayFee);
+        }
         require(ownerOffers[offer.owner].add(id), "insert owner offer failed.");
         
         bytes32 pair = keccak256(abi.encodePacked(src, dest));
@@ -397,17 +411,27 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
     
     function enabled() public view returns(bool)
     {
-        return true;
+        return enableMake;
     }
 
     /**
      * admin ops.
      */
+    event logEnable(address caller, bool enableMake);
+    function setEnabled(bool _enableMake) public auth
+    {
+        require(_enableMake != enableMake);
+        enableMake = _enableMake;
+        emit logEnable(msg.sender, enableMake);
+    }
+
+    event logSetToken(address caller, DSToken token, bool enable);
     function setToken(DSToken token, bool enable) public auth
     {
         require(gateway_cntrt != address(0x00));
         require((enable && !listTokens[token]) || (!enable && listTokens[token]) , "token enable status wrong!");
         listTokens[token] = enable;
+        emit logSetToken(msg.sender, token, enable);
     }
 
     function setCoinRapGateway(address gateway) public auth
@@ -421,13 +445,38 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         code = 0;
         if (isActive(id))
         {
-            bytes32 h = keccak256("\x19Ethereum Signed Message:\n32", msghash);
+            // bytes32 h = keccak256("\x19Ethereum Signed Message:\n32", msghash);
             OfferInfo memory offer = offers[id];
-            if(ecrecover(h, v, r, s)==offer.owner)
+            if(ecrecover(msghash, v, r, s)==offer.owner)
             {
                 code = offer.code;
             }
         }
+    }
+
+    event WithdrawAddressApproved(DSToken token, address addr, bool approve);
+    function approvedWithdrawAddress(DSToken token, address addr, bool approve) public auth
+    {
+        withdrawAddresses[keccak256(abi.encodePacked(token,addr))] = approve;
+        emit WithdrawAddressApproved(token, addr, approve);
+    }
+
+    event TokenWithdraw(DSToken token, uint amnt, address receiver);
+    function withrawToken(DSToken token, uint amnt, address receiver) external auth
+    {
+        require(withdrawAddresses[keccak256(abi.encodePacked(token,receiver))]);
+        uint balance = getBalance(token, address(this));
+        uint inOrder = balanceInOrder[token];
+        require(amnt <= balance - inOrder);
+        if(token == ETH_TOKEN_ADDRESS)
+        {
+            receiver.transfer(amnt);
+        }
+        else
+        {
+            require(token.transfer(receiver, amnt));
+        }
+        emit TokenWithdraw(token, amnt, receiver);
     }
 
 }

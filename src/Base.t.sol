@@ -47,9 +47,12 @@ contract BaseTest is DSTest, DSMath {
         // srcAmnt = 1100000000;
         // destAmnt = 1000000;
         // expectWadRate = 909091;
-        srcAmnt = 3 * 10**15;
-        destAmnt = 11000000000001000000;
-        expectWadRate = 3666666666667;
+        // srcAmnt = 3 * 10**15;
+        // destAmnt = 11000000000001000000;
+        // expectWadRate = 3666666666667;
+        srcAmnt = 14562000000000000000000;
+        destAmnt = 100000000000000000;
+        expectWadRate = 6868;
 
         // expectWadRate = 909090909090909;
         rate = base.calcWadRate(srcAmnt, destAmnt, 18);
@@ -60,17 +63,25 @@ contract BaseTest is DSTest, DSMath {
         assertEq(rate, expectWadRate);
         qty = base.calcSrcQty(destAmnt, 18, 18,rate);
         assertEq(qty, srcAmnt);
-        // bytes32 msghash = 0x9c22ff5f21f0b81b113e63f7db6da94fedef11b2119b4088b89664fb9a3cb658;
-        // bytes32 r = 0xeeeb2e746094a673f4e0f942b7560dead3aa6bb37d01f39222a7e53bf4b53872;
-        // bytes32 s = 0x403563da6b621b21fae1606ab75fcda2607cec72d5074de72fdee34a05364492;
-        // assertEq(ecrecover(h, v, r, s), address(0x5727d938aa27D631f1C2b9CdBF6Ba235953b621B));
+        uint8 v = 28;
+        // bytes32 h = 0x1476abb745d423bf09273f1afd887d951181d25adc66c4834a70491911b7f750;
+        // bytes32 r = 0xe6ca9bba58c88611fad66a6ce8f996908195593807c4b38bd528d2cff09d4eb3;
+        // bytes32 s = 0x3e5bfbbf4d3e39b1a2fd816a7680c19ebebaf3a141b239934ad43cb33fcec8ce;
+        // address addr = ecrecover(h, v, r, s);
+        // assertEq(addr, address(0x5ce9454909639D2D17A3F753ce7d93fa0b9aB12E));
         
-        // bytes32 msghash = 0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8;
-        // bytes32 h = keccak256("\x19Ethereum Signed Message:\n32", msghash);
-        // bytes32 r = 0x9242685bf161793cc25603c231bc2f568eb630ea16aa137d2664ac8038825608;
-        // bytes32 s = 0x4f8ae3bd7535248d0bd448298cc2e2071e56992d0774dc340c368ae950852ada;
-        // uint8 v = 28;
-        // assertEq(ecrecover(h, v, r, s), address(0x33692EE5CBF7EcDb8cA43eC9E815C47F3Db8Cd11));
+        // bytes32 msghash = 0x637027ead3e166d3b96679f11241cd71b8917780c5d669b44659d364950002e7;
+        // bytes32 h = msghash; //keccak256("\x19Ethereum Signed Message:\n32", msghash);
+        // bytes32 r = 0x5afbf5f7a4c5e3f46c989f8b4c34d7660ff6f9ddb66f48282d53609b7f97e712;  // 41153332590067763136963621823720559789582984567710433983028445548701034211090;
+        // bytes32 s = 0x4ef0fbd4d32ac66738433471d53ce76bf0cd72b602336357ba89a8eac4ea981b;  // 35706183561121818561236792521317601083264836186301836213702387435094707705883;
+        // // uint8 v = 28;
+        // assertEq(ecrecover(h, v, r, s), address(0x897eeaF88F2541Df86D61065e34e7Ba13C111CB8));
+        v = 27;
+        bytes32 h = 0xf43d6d30b9222da6f031252c5148fc8ceb80edf5ceccbf755daa8d6780fb8435;
+        bytes32 r = 0xb81e2a1eb76f2d12efbba7fb583689e84ce5c4f555f49011fd87a984dbba1d42;
+        bytes32 s = 0x262488da64b6d206090b035d432cc39cec772ff11bc89bb9a7603e016ef615f;
+        address addr = ecrecover(h, v, r, s);
+        assertEq(addr, address(0x5727d938aa27D631f1C2b9CdBF6Ba235953b621B));
         
 
         // uint wad = base.toWad(srcAmnt, 18);
