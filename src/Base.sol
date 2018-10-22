@@ -57,14 +57,14 @@ contract Base is DSMath
         uint numerator;
         uint denominator;
         if (srcDecimals >= dstDecimals) {
-            require((srcDecimals - dstDecimals) <= MAX_DECIMALS);
-            numerator = (dstQty * (10**(srcDecimals - dstDecimals)));
-            denominator = rate * (10**(srcDecimals/2));
+            require(srcDecimals - dstDecimals <= MAX_DECIMALS);
+            numerator = mul(dstQty, (10**(srcDecimals - dstDecimals)));
+            denominator = mul(rate, (10**(srcDecimals/2)));
             return wdiv(numerator, denominator);
         } else {
-            require((dstDecimals - srcDecimals) <= MAX_DECIMALS);
+            require(dstDecimals - srcDecimals <= MAX_DECIMALS);
             numerator = dstQty ;
-            denominator = rate  * (10**(dstDecimals - srcDecimals + srcDecimals/2));
+            denominator = mul(rate, (10**(dstDecimals - srcDecimals + srcDecimals/2)));
             return wdiv(numerator, denominator);
         }
         // return (numerator + denominator - 1) / denominator; //avoid rounding down errors
@@ -82,7 +82,8 @@ contract Base is DSMath
     function calcWadRate(uint srcAmnt, uint destAmnt, uint srcDecimals) public pure returns(uint rate)
     {
         require(srcDecimals % 2 == 0);
-        rate = wdiv(destAmnt, mul(srcAmnt, 10**(srcDecimals/2)));
+        uint precision = srcDecimals / 2;
+        rate = add(mul(destAmnt, 10 ** precision), srcAmnt -1) / srcAmnt;
         require(rate > 0 && rate < MAX_RATE, "incorrect rate!");
     }
 
