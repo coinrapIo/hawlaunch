@@ -12,7 +12,8 @@ contract C2CMktTest is DSTest {
     C2CMkt c2c;
     CoinRapGateway gateway;
     uint startsWith = 0;
-    uint initialBalance = 1000 * 10 ** 18;
+    uint initialBalance = 100000 * 10 ** 18;
+    uint user1CrpAmnt = 10000*10**18;
     DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
     DSToken constant internal WETH_TOKEN_ADDR = DSToken(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address user1 = address(0x897eeaF88F2541Df86D61065e34e7Ba13C111CB8);
@@ -21,6 +22,7 @@ contract C2CMktTest is DSTest {
     function setUp() public 
     {
         c2c = new C2CMkt(address(this), startsWith);
+
         gateway = new CoinRapGateway();
         gateway.set_c2c_mkt(c2c);
         c2c.setCoinRapGateway(gateway);
@@ -30,6 +32,7 @@ contract C2CMktTest is DSTest {
         crp.mint(initialBalance);
 
         user1.transfer(5*10**18);  // test -5eth-> user1
+        crp.transfer(user1, user1CrpAmnt); //
     }
 
     function () public payable
@@ -75,6 +78,15 @@ contract C2CMktTest is DSTest {
         // assertTrue(code == _code);
         assertEq(c2c.getOfferCnt(this), 1);
         assertTrue(c2c.isActive(id));
+        assertEq(c2c.getOwner(id), address(this));
+        // uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code
+        c2c.update(id, _destAmnt, _min, _max, 0);
+        uint amnt;
+        uint fee;
+        (amnt, fee) = c2c.cancel(id);
+        assertEq(amnt -_fee, _srcAmnt);
+        assertEq(fee, _fee);
+
     }
 
     function test_make_take() public
@@ -90,11 +102,39 @@ contract C2CMktTest is DSTest {
         // uint prepay, uint rng_min, uint rng_max, uint16 code, bytes ref
         uint id = c2c.make.value(_srcAmnt+_fee)(user1, ETH_TOKEN_ADDRESS, _srcAmnt, crp, _destAmnt, _min, _max, _code);
         assertEq(id, startsWith+1);
-        assertEq(crp.balanceOf(this), initialBalance);
-        crp.approve(address(gateway));
-        (_destAmnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, 500*10**18, 1000*10**18, 1234);
+        assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt);
+        assertTrue(crp.approve(address(gateway), 2**255));
+        (_destAmnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, 500*10**18, 1000*10**9, _code);
+        assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt-500*10**18);
         assertEq(_destAmnt, 5*10**17);
         assertEq(_fee, 0);
+        
+    }
+
+    function test_make_take_token_to_eth() public
+    {
+        uint _src_amnt = 1000 * 10 ** 18; //token
+        uint _dest_amnt = 10**18; //eth
+        uint _min = 5 * 10 **17;
+        uint _max = _dest_amnt;
+        uint _fee = 5 * 10 ** 14;
+        uint16 _code = 1234;
+
+        uint rate = c2c.calcWadRate(_src_amnt, _dest_amnt, c2c.getDecimalsSafe(crp));
+        assertEq(rate, 10**6);
+
+        crp.approve(address(gateway), 2**255);
+        // uint id = gateway.make.value(0)(crp, _src_amnt, ETH_TOKEN_ADDRESS, _dest_amnt, _min, _max, _code);
+        crp.transfer(c2c, _src_amnt);
+        uint id = c2c.make.value(0)(user1, crp, _src_amnt, ETH_TOKEN_ADDRESS, _dest_amnt, _min, _max, _code);
+        assertEq(_src_amnt, crp.balanceOf(c2c));
+        assertEq(id, startsWith+1);
+        
+        (_dest_amnt, _fee) = gateway.take.value(5*10**17)(id, crp, ETH_TOKEN_ADDRESS, 5*10**17, 10**6, _code);
+        assertEq(_dest_amnt, 500*10**18);
+        assertEq(_fee, 0);
+        
+
     }
 
     function validate_offer(uint id, DSToken _src, uint _srcAmnt, DSToken _dest, uint _destAmnt, uint _min, uint _max, uint16 _code) internal
@@ -106,10 +146,10 @@ contract C2CMktTest is DSTest {
         uint min;
         uint max;
         address owner;
-        uint16 code;
+        // uint16 code;
         // bool hasCode;
 
-        (, srcAmnt,  , destAmnt, owner, min, max, ,code ) = c2c.getOffer(id);
+        (, srcAmnt,  , destAmnt, owner, min, max, , , ) = c2c.getOffer(id);
         // assertTrue(src == ETH_TOKEN_ADDRESS);
         // assertTrue(dest == crp);
         assertEq(srcAmnt, _srcAmnt);
@@ -118,7 +158,7 @@ contract C2CMktTest is DSTest {
         assertEq(min, _min);
         assertEq(max, _max);
         // assertTrue(hasCode == (_code > 0));
-        assertTrue(code == _code);
+        // assertTrue(code == _code);
     }
 
     function test_take() public

@@ -38,7 +38,7 @@ library SetLib
         {
             uint mv_key = self.keys[self.keys.length-1];
             self.keys[rm_key_idx] = mv_key;
-            self.items[rm_key_idx].key_idx = rm_key_idx;
+            self.items[mv_key].key_idx = rm_key_idx;
         }
         self.keys.length--;
 
