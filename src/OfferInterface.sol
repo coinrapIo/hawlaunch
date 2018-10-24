@@ -36,7 +36,9 @@ interface OfferInterface
         DSToken src, uint srcAmnt, DSToken dest, uint destAmnt, 
         address owner, uint min, uint max, bool hasCode,
         uint prepay, uint accumEther);
+    function getOfferByIds(uint[] ids) public view returns(
+        uint[], uint[], uint[], uint[]);
     function set_c2c_mkt(address c2c) public;
-    function getOfferCode(uint id, bytes32 msghash, uint8 v, bytes32 r, bytes32 s)  public view returns(uint16 code);
+    function getOfferCode(uint id, bytes32 msghash, uint8 v, bytes32 r, bytes32 s) public view returns(uint16 code);
 
 }

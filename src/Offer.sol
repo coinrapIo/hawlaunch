@@ -30,14 +30,9 @@ contract OfferData is OfferInterface, Base, DSAuth
 
     uint public lastOfferId;
     bool locked;
-    mapping(uint=>OfferInfo) offers;
-    mapping(address => SetLib.Set) internal ownerOffers;
-    // DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
-    // uint constant internal WAD_BPS = (10**22);
-    // uint  constant internal MAX_QTY   = (10**28); // 10B tokens
-    // uint  constant internal MAX_RATE  = 10**24; // up to 1M tokens per ETH
-    // uint  constant internal MAX_DECIMALS = 18;
-    address c2c;
+    mapping(uint=>OfferInfo) public offers;
+    mapping(address => SetLib.Set) ownerOffers;
+    address public c2c;
 
     constructor(uint startWith) public DSAuth()
     {
@@ -138,8 +133,9 @@ contract OfferData is OfferInterface, Base, DSAuth
     }
     
     function take_offer(uint id, DSToken dest, uint amnt, uint srcAmnt) 
-        external synchronized returns (uint actualAmnt, uint fee, uint ownerAmntBySell, bool full_filled)
+        public synchronized returns (uint actualAmnt, uint fee, uint ownerAmntBySell, bool full_filled)
     {
+        require(msg.sender == c2c);
         fee = 0;
         ownerAmntBySell = 0;
         offers[id].srcAmnt = sub(offers[id].srcAmnt, srcAmnt);
@@ -198,10 +194,10 @@ contract OfferData is OfferInterface, Base, DSAuth
         
         if(offers[id].srcAmnt == 0)
         {
-            require(ownerOffers[owner].remove(id), "remove owner offer failed");
-            if (getOfferCnt(owner) == 0)
+            require(ownerOffers[offers[id].owner].remove(id), "remove owner offer failed");
+            if (getOfferCnt(offers[id].owner) == 0)
             {
-                delete ownerOffers[owner];
+                delete ownerOffers[offers[id].owner];
             }
             full_filled = true;
             delete offers[id];
@@ -212,19 +208,21 @@ contract OfferData is OfferInterface, Base, DSAuth
     
     function kill_offer(uint id) public returns(uint src_amnt, uint fee)
     {
+        require(msg.sender == c2c);
         OfferInfo memory offer = offers[id];
         src_amnt = offer.srcAmnt;
         fee = offer.prepay;
-        require(ownerOffers[owner].remove(id), "remove owner offer failed!");
-        if (getOfferCnt(owner) == 0)
+        require(ownerOffers[offer.owner].remove(id), "remove owner offer failed!");
+        if (getOfferCnt(offer.owner) == 0)
         {
-            delete ownerOffers[owner];
+            delete ownerOffers[offer.owner];
         }
         delete offers[id];
     }
 
     function update_offer(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) public returns(uint old_dest_amnt)
     {
+        require(msg.sender == c2c);
         require(check_rate_and_qty(offers[id].src, offers[id].srcAmnt, offers[id].dest, destAmnt));
         old_dest_amnt = offers[id].destAmnt;
         if (offers[id].destAmnt != destAmnt)
@@ -259,10 +257,12 @@ contract OfferData is OfferInterface, Base, DSAuth
         }
     }
 
-    function set_c2c_mkt(address _c2c) public
+    event SetC2CMkt(address caller, address c2c);
+    function set_c2c_mkt(address _c2c) public auth
     {
         require(_c2c != address(0x00));
         c2c = _c2c;
+        emit SetC2CMkt(msg.sender, c2c);
     }
 
     function getOfferCnt(address owner) public view returns(uint cnt)
@@ -274,6 +274,33 @@ contract OfferData is OfferInterface, Base, DSAuth
     {
         uint[] memory keys = ownerOffers[owner].getKeys();
         return keys;
+    }
+
+    function getOfferByIds(uint[] ids) public view returns(
+        uint[], uint[], uint[], uint[]
+        )
+    {
+        // DSToken[] memory src = new DSToken[](ids.length);
+        uint[] memory src_amnt = new uint[](ids.length);
+        // DSToken[] memory dest = new DSToken[](ids.length);
+        uint[] memory dest_amnt = new uint[](ids.length);
+        // address[] memory owner = new address[](ids.length);
+        // uint[] memory rng_min = new uint[](ids.length);
+        // uint[] memory rng_max = new uint[](ids.length);
+        // bool[] memory has_code = new bool[](ids.length);
+        // uint16[] memory code = new uint16[](ids.length);
+        uint[] memory prepay = new uint[](ids.length);
+        uint[] memory accum = new uint[](ids.length);
+
+        for(uint i = 0; i < ids.length; i++)
+        {
+            OfferInfo offer = offers[ids[i]];
+            src_amnt[i] = offer.srcAmnt;
+            dest_amnt[i] = offer.destAmnt;
+            prepay[i] = offer.prepay;
+            accum[i] = offer.accumTradeAmnt;
+        }
+        return (src_amnt, dest_amnt,prepay, accum);
     }
 
 }

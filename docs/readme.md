@@ -54,13 +54,17 @@ export ETH_RPC_URL=https://kovan.infura.io/v3/7f64cd98c4f14db1bd868b7e1a57649e
 
 
 kovan:
-C2C=0x8345133695d0d8caf30ace06c81829254a487ace
-OFFER=0x84dd7ef80aaf0974f95844a29ae480493c3e0143
-GATEWAY=0x04f21a99a122575d08609c9e8c0e001714ecab4d
+
 ```
+dapp create OfferData 1000000 --gas 6000000
+OFFER=0x1ab3e66a3d7da14ae7795aa7322832a811a0ae74
+dapp create C2CMkt $OFFER --gas 6000000
+dapp create CoinRapGateway --gas 6000000
+
+C2C=0x8a61cfb20f637af835f83aeb851052397e3dc2c2
+GATEWAY=0x637591dc749e7a6839fd048f8bfea471e5f2dade
+
 # set c2c.gateway
-C2C=0x8345133695d0d8caf30ace06c81829254a487ace
-GATEWAY=0x04f21a99a122575d08609c9e8c0e001714ecab4d
 seth send $C2C "setCoinRapGateway(address)" $GATEWAY
 
 seth send $OFFER 'set_c2c_mkt(address)' $C2C
@@ -68,6 +72,7 @@ seth send $OFFER 'set_c2c_mkt(address)' $C2C
 # set c2c.listed tokens
 SMT=0xa03D360215C62afD2d324aaBda422B92d78b7684
 seth send $C2C "setToken(address,bool)" $SMT true
+
 
 
 # set gateway.c2c
