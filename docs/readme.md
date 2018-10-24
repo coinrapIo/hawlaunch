@@ -54,12 +54,16 @@ export ETH_RPC_URL=https://kovan.infura.io/v3/7f64cd98c4f14db1bd868b7e1a57649e
 
 
 kovan:
-C2C=0xc7fe34932229a3b2c86e05d5e93e0e2161fc4455
+C2C=0x8345133695d0d8caf30ace06c81829254a487ace
+OFFER=0x84dd7ef80aaf0974f95844a29ae480493c3e0143
+GATEWAY=0x04f21a99a122575d08609c9e8c0e001714ecab4d
 ```
 # set c2c.gateway
-C2C=0xc7fe34932229a3b2c86e05d5e93e0e2161fc4455
-GATEWAY=0x14c23e9f55c1668e9bbe41af9b6459fa552c62e3
+C2C=0x8345133695d0d8caf30ace06c81829254a487ace
+GATEWAY=0x04f21a99a122575d08609c9e8c0e001714ecab4d
 seth send $C2C "setCoinRapGateway(address)" $GATEWAY
+
+seth send $OFFER 'set_c2c_mkt(address)' $C2C
 
 # set c2c.listed tokens
 SMT=0xa03D360215C62afD2d324aaBda422B92d78b7684

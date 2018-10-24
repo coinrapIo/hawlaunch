@@ -184,7 +184,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
 
     function validate_take_input(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code) internal view 
     {
-        require(wad_min_rate >0 && c2c.isActive(id));
+        require(wad_min_rate >0 && c2c.isActiveOffer(id));
         
         DSToken o_dest;
         DSToken o_src;
@@ -192,7 +192,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         address o_owner;
         uint o_min;
         uint o_max;
-        (o_src, , o_dest, o_dest_amnt, o_owner, o_min, o_max, , , ) = c2c.getOffer(id);
+        (o_src, ,o_dest, o_dest_amnt, o_owner, o_min, o_max) = c2c.getOffer(id);
         if (o_dest_amnt < o_min)
         {
             o_min = o_dest_amnt;
