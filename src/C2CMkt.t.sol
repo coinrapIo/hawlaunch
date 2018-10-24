@@ -3,6 +3,7 @@ pragma solidity ^0.4.24;
 import "ds-test/test.sol";
 import "ds-math/math.sol";
 import "ds-token/token.sol";
+import "./Offer.sol";
 import "./C2CMkt.sol";
 import "./CoinRapGateway.sol";
 
@@ -10,6 +11,7 @@ contract C2CMktTest is DSTest {
     
     DSToken crp;
     C2CMkt c2c;
+    OfferData offer_data;
     CoinRapGateway gateway;
     uint startsWith = 0;
     uint initialBalance = 100000 * 10 ** 18;
@@ -21,11 +23,14 @@ contract C2CMktTest is DSTest {
 
     function setUp() public 
     {
-        c2c = new C2CMkt(address(this), startsWith);
+        offer_data = new OfferData(startsWith);
+        c2c = new C2CMkt(offer_data);
+        offer_data.set_c2c_mkt(c2c);
 
         gateway = new CoinRapGateway();
         gateway.set_c2c_mkt(c2c);
         c2c.setCoinRapGateway(gateway);
+
 
         crp = new DSToken("CRP");
         c2c.setToken(crp, true);
@@ -76,8 +81,8 @@ contract C2CMktTest is DSTest {
         // assertEq(max, _max);
         // assertTrue(hasCode == (_code > 0));
         // assertTrue(code == _code);
-        assertEq(c2c.getOfferCnt(this), 1);
-        assertTrue(c2c.isActive(id));
+        assertEq(offer_data.getOfferCnt(this), 1);
+        assertTrue(c2c.isActiveOffer(id));
         assertEq(c2c.getOwner(id), address(this));
         // uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code
         c2c.update(id, _destAmnt, _min, _max, 0);
@@ -149,7 +154,7 @@ contract C2CMktTest is DSTest {
         // uint16 code;
         // bool hasCode;
 
-        (, srcAmnt,  , destAmnt, owner, min, max, , , ) = c2c.getOffer(id);
+        (, srcAmnt,  , destAmnt, owner, min, max ) = c2c.getOffer(id);
         // assertTrue(src == ETH_TOKEN_ADDRESS);
         // assertTrue(dest == crp);
         assertEq(srcAmnt, _srcAmnt);

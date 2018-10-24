@@ -1,17 +1,15 @@
 pragma solidity ^0.4.24;
 
-import "ds-math/math.sol";
 import "ds-token/token.sol";
-// import "erc20/erc20.sol";
 
-contract Base is DSMath
+contract Base
 {
     DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
-    uint  constant internal PRECISION = (10**18);
+    // uint  constant internal PRECISION = (10**18);
     uint  constant internal MAX_QTY   = (10**28); // 10B tokens
-    uint  constant internal MAX_RATE  = (PRECISION * 10**6); // up to 1M tokens per ETH
+    uint  constant internal MAX_RATE  = 10**24; // up to 1M tokens per ETH
     uint  constant internal MAX_DECIMALS = 18;
-    uint  constant internal ETH_DECIMALS = 18;
+    // uint  constant internal ETH_DECIMALS = 18;
     uint constant internal WAD_BPS = (10**22);
     mapping(address=>uint) internal decimals;
 
@@ -19,6 +17,22 @@ contract Base is DSMath
     // uint8 admin_role = 1;
     // uint8 mod_role = 2;
     // uint8 user_role = 3;
+
+    function add(uint x, uint y) internal pure returns (uint z) {
+        require((z = x + y) >= x);
+    }
+    
+    function sub(uint x, uint y) internal pure returns (uint z) {
+        require((z = x - y) <= x);
+    }
+
+    function mul(uint x, uint y) internal pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x);
+    }
+
+    function wdiv(uint x, uint y) internal pure returns (uint z) {
+        z = add(mul(x, 10**18), y / 2) / y;
+    }
 
     function getBalance(DSToken token, address user) public view returns(uint) 
     {
@@ -31,13 +45,13 @@ contract Base is DSMath
     function setDecimals(DSToken token) internal 
     {
         if (token == ETH_TOKEN_ADDRESS)
-            decimals[token] = ETH_DECIMALS;
+            decimals[token] = MAX_DECIMALS;
         else 
             decimals[token] = token.decimals();
     }
 
     function getDecimals(DSToken token) internal view returns(uint) {
-        if (token == ETH_TOKEN_ADDRESS) return ETH_DECIMALS; // save storage access
+        if (token == ETH_TOKEN_ADDRESS) return MAX_DECIMALS; // save storage access
         uint tokenDecimals = decimals[token];
         // technically, there might be token with decimals 0
         // moreover, very possible that old tokens have decimals 0
