@@ -175,7 +175,16 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         // emit LogBalance(o_owner, aft.cntrt.srcBalance, aft.maker.destBalance, aft.taker.srcBalance, aft.taker.destBalance);
         
         require(sub(before.cntrt.srcBalance, actual_amnt) == aft.cntrt.srcBalance, "src balance wrong(contract)");
-        require(sub(add(before.maker.destBalance, dest_amnt),fee) == aft.maker.destBalance, "dest balance wrong(maker)");
+        if (dest == ETH_TOKEN_ADDRESS)
+        {
+            //maker's view: token->eth, sell. postpaid.
+            require(sub(add(before.maker.destBalance, dest_amnt),fee) == aft.maker.destBalance, "dest balance wrong(maker)");
+        }
+        else
+        {
+            //maker's view: eth->token, buy. prepay.
+            require(add(before.maker.destBalance, dest_amnt) == aft.maker.destBalance, "dest balance wrong(maker)");
+        }
         require(add(before.taker.srcBalance, actual_amnt) == aft.taker.srcBalance, "src balance wrong(taker)");
         require(sub(before.taker.destBalance, dest_amnt) == aft.taker.destBalance, "dest balance wrong(taker)");
     }

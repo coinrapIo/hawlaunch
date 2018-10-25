@@ -57,12 +57,12 @@ kovan:
 
 ```
 dapp create OfferData 1000000 --gas 6000000
-OFFER=0x1ab3e66a3d7da14ae7795aa7322832a811a0ae74
+OFFER=0xffec90c95e27c20198cc06725c896462fe418671
 dapp create C2CMkt $OFFER --gas 6000000
 dapp create CoinRapGateway --gas 6000000
 
-C2C=0x8a61cfb20f637af835f83aeb851052397e3dc2c2
-GATEWAY=0x637591dc749e7a6839fd048f8bfea471e5f2dade
+C2C=0xde3c994c92593812277e07f6744b5ffaccd0fd78
+GATEWAY=0x35867b69c3e3d9e0c588cb49348c87e0dc5ce545
 
 # set c2c.gateway
 seth send $C2C "setCoinRapGateway(address)" $GATEWAY
