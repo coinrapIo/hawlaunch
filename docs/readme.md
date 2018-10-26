@@ -47,10 +47,11 @@ dapp create CoinRapGateway --gas=7400000
 export SETH_CHAIN=kovan
 export ETH_FROM=897eeaF88F2541Df86D61065e34e7Ba13C111CB8
 export ETH_KEYSTORE=/home/dust/.ethereum/keystore
+export ETH_KEYSTORE=/home/dust/.ethereum/pwd/testnet.pwd
 export ETH_RPC_URL=https://kovan.infura.io/v3/7f64cd98c4f14db1bd868b7e1a57649e
 ```
 
-其中keystore文件替换成自己能控制的,或者联系我获得.
+其中keystore文件可以使用` keystore.tar.gz `中的keystore文件放到`ETH_KEYSTORE`目录． **虽然是测试环境，也需要注意keystore文件的安全**
 
 
 kovan:

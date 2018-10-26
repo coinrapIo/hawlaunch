@@ -1,0 +1,5 @@
+export SETH_CHAIN=kovan
+export ETH_FROM=897eeaF88F2541Df86D61065e34e7Ba13C111CB8
+export ETH_KEYSTORE=/home/dust/.ethereum/keystore
+export ETH_RPC_URL=https://kovan.infura.io/v3/7f64cd98c4f14db1bd868b7e1a57649e
+
