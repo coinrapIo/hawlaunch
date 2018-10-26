@@ -19,6 +19,7 @@ contract C2CMktTest is DSTest {
     DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
     DSToken constant internal WETH_TOKEN_ADDR = DSToken(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address user1 = address(0x897eeaF88F2541Df86D61065e34e7Ba13C111CB8);
+    address fee_wallet = address(0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577);
     
 
     function setUp() public 
@@ -102,6 +103,7 @@ contract C2CMktTest is DSTest {
         uint _max = _destAmnt;
         uint _fee = 5*10**14;
         uint16 _code = 1234;
+        uint take_amnt=0;
         // bytes memory _ref;
         // DSToken src, uint src_amnt, DSToken dest, uint dest_amnt, 
         // uint prepay, uint rng_min, uint rng_max, uint16 code, bytes ref
@@ -109,10 +111,15 @@ contract C2CMktTest is DSTest {
         assertEq(id, startsWith+1);
         assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt);
         assertTrue(crp.approve(address(gateway), 2**255));
-        (_destAmnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, 500*10**18, 1000*10**9, _code);
-        assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt-500*10**18);
-        assertEq(_destAmnt, 5*10**17);
-        assertEq(_fee, 0);
+        (take_amnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, _destAmnt, 1000*10**9, _code);
+        assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt-_destAmnt);
+        assertEq(address(c2c).balance, _fee);
+        c2c.approvedWithdrawAddress(ETH_TOKEN_ADDRESS, fee_wallet,true);
+        uint bal = fee_wallet.balance;
+        c2c.withdraw(ETH_TOKEN_ADDRESS, _fee, fee_wallet);
+        assertEq(fee_wallet.balance, bal + _fee);
+        assertEq(take_amnt, _srcAmnt);
+        assertEq(_fee, 5*10**14);
         
     }
 
