@@ -236,7 +236,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         public canMake(src, dest) payable returns (uint id)
     {
         // TODO: 用于单元测试时，需要注释掉．
-        require(msg.sender == gateway_cntrt);
+        // require(msg.sender == gateway_cntrt);
         require((code>=0 && code < 9999), "incorrect code argument.");
         
         getDecimalsSafe(src);
@@ -258,7 +258,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         public payable returns (uint actualAmnt, uint fee)
     {
         // TODO: 用于单元测试时，需要注释掉．
-        require(msg.sender == gateway_cntrt);
+        // require(msg.sender == gateway_cntrt);
         require((tkDstTkn == ETH_TOKEN_ADDRESS || msg.value == 0), "The token of pay for or amount incorrect.");
         address maker;
         DSToken src;
@@ -368,7 +368,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
     }
 
     event LogWithdraw(DSToken token, uint amnt, address receiver);
-    function withraw(DSToken token, uint amnt, address receiver) external auth returns(bool)
+    function withdraw(DSToken token, uint amnt, address receiver) external auth returns(bool)
     {
         require(withdrawAddresses[keccak256(abi.encodePacked(token,receiver))]);
         uint balance = getBalance(token, address(this));
