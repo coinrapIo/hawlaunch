@@ -53,6 +53,18 @@ export ETH_RPC_URL=https://kovan.infura.io/v3/7f64cd98c4f14db1bd868b7e1a57649e
 
 其中keystore文件可以使用` keystore.tar.gz `中的keystore文件放到`ETH_KEYSTORE`目录． **虽然是测试环境，也需要注意keystore文件的安全**
 
+```
+RAP=0xA3d472DDE15D4c8e4CdFAA90baaAa4384E7D5f7F
+T8=0xcE76efc1d64580b0fdfBAcA2960B7522D6129bf3
+SMT=0xa03d360215c62afd2d324aabda422b92d78b7684
+
+# send 10^7 rap to 0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577
+seth send $RAP 'transfer(address,uint256)' 0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577 $(seth --to-uint256 $(seth --to-wei 10000000 ether))
+# send 10^7 smt to 0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577
+seth send $SMT 'transfer(address,uint256)' 0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577 $(seth --to-uint256 $(seth --to-wei 10000000 ether))
+# send 10^7 t8 to 0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577, the decimal is 8．
+seth send $T8 'transfer(address,uint256)' 0x0fc7ebf20B23437E359Bba1D214a4ED0ad72f577 $(seth --to-uint256 $(seth --to-wei  0.001 ether))
+```
 
 kovan:
 
