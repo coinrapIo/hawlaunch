@@ -28,9 +28,11 @@ contract BaseTest is DSTest, DSMath {
         // function calcRate(uint srcAmnt, uint srcDecimals, uint destAmnt, uint dstDecimals) 
         uint srcAmnt = 10**18;
         uint destAmnt = 68675 * 10 ** 14;
-        uint expectWadRate = 68675 * 10 ** 5;
+        uint expectWadRate = 68675 * 10 ** 14;
+        uint srcDecimals = 18;
+        uint destDecimals = 18;
         // expectEventsExact(this);
-        uint rate = base.calcWadRate(srcAmnt, destAmnt);
+        uint rate = base.calcWadRate(srcAmnt, 18, destAmnt, 18);
         
         // emit log_named_decimal_uint("wad_rate", rate, 18);
         assertEq(rate, expectWadRate);
@@ -52,32 +54,36 @@ contract BaseTest is DSTest, DSMath {
         // expectWadRate = 3666666666667;
         srcAmnt = 14562 * 10**18;
         destAmnt = 1 * 10 ** 17;
-        expectWadRate = 6868;
+        expectWadRate = destAmnt * 10 **(18+18-18) / srcAmnt;
 
         // expectWadRate = 909090909090909;
-        rate = base.calcWadRate(srcAmnt, destAmnt);
+        rate = base.calcWadRate(srcAmnt, 18, destAmnt, 18);
         // rate = wdiv(destAmnt, srcAmnt*10**9);
 
         // uint remainder = destAmnt % srcAmnt;
         // assertEq(remainder, 0);
         assertEq(rate, expectWadRate);
         qty = base.calcSrcQty(destAmnt, 18, 18,rate);
-        assertEq(qty, srcAmnt);
+        assertEq(qty, srcAmnt); //qty == src==14560279557367501456028
 
 
         srcAmnt = 10**16;
         destAmnt = 100*10**8;
-        expectWadRate = 1000 ;
-        rate = base.calcWadRate(srcAmnt, destAmnt);
+        srcDecimals = 18;
+        destDecimals = 8;
+        expectWadRate = destAmnt * 10 **(18+srcDecimals-destDecimals) / srcAmnt;
+        rate = base.calcWadRate(srcAmnt, srcDecimals, destAmnt, destDecimals);
         assertEq(rate, expectWadRate);
-        qty = base.calcSrcQty(destAmnt, 18, 8, rate);
+        qty = base.calcSrcQty(destAmnt, srcDecimals, destDecimals, rate);
         assertEq(qty, srcAmnt);
 
 
         srcAmnt = 100*10**8;
         destAmnt = 10**16;
-        expectWadRate = 1000000000000000;
-        rate = base.calcWadRate(srcAmnt, destAmnt);
+        srcDecimals = 8;
+        destDecimals = 18;
+        expectWadRate = (destAmnt * 10 **18) / (srcAmnt * 10**(destDecimals-srcDecimals)); //10**15;
+        rate = base.calcWadRate(srcAmnt, 8, destAmnt, 18);
         assertEq(rate, expectWadRate);
         qty = base.calcSrcQty(destAmnt, 8, 18, rate);
         assertEq(qty, srcAmnt);
@@ -86,24 +92,31 @@ contract BaseTest is DSTest, DSMath {
         srcAmnt = 3 * 10**16;
         // destAmnt = 100*10**8;
         destAmnt = 10020000000;
-        expectWadRate = 334;
-        rate = base.calcWadRate(srcAmnt, destAmnt);
+        srcDecimals = 18;
+        destDecimals = 8;
+        expectWadRate = destAmnt * 10 **(18+srcDecimals-destDecimals) / srcAmnt;
+        // expectWadRate = 334;
+        rate = base.calcWadRate(srcAmnt, 18, destAmnt, 8);
         assertEq(rate, expectWadRate);
         qty = base.calcSrcQty(destAmnt, 18, 8, rate);
         assertEq(qty, srcAmnt);
 
         srcAmnt = 21800000000000000;
         destAmnt = 100000000146;
-        expectWadRate = 4588;
-        rate = base.calcWadRate(srcAmnt, destAmnt);
+        srcDecimals = 18;
+        destDecimals = 8;
+        expectWadRate = destAmnt * 10 **(18+srcDecimals-destDecimals) / srcAmnt;
+        rate = base.calcWadRate(srcAmnt, 18, destAmnt, 8);
         assertEq(rate, expectWadRate);
         qty = base.calcSrcQty(destAmnt, 18, 8, rate);
         assertEq(qty, srcAmnt);
 
         srcAmnt = 30000000000000000;  //0.08 * 10 ** 18
         destAmnt = 10000000000; //95.12 * 10**8
-        expectWadRate = 334;
-        rate = base.calcWadRate(srcAmnt, destAmnt);
+        srcDecimals = 18;
+        destDecimals = 8;
+        expectWadRate = destAmnt * 10 **(18+srcDecimals-destDecimals) / srcAmnt;
+        rate = base.calcWadRate(srcAmnt,18, destAmnt, 8);
         assertEq(rate, expectWadRate);
         qty = base.calcSrcQty(destAmnt, 18, 8, rate);
         assertEq(qty, srcAmnt);

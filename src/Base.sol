@@ -7,9 +7,8 @@ contract Base
     DSToken constant internal ETH_TOKEN_ADDRESS = DSToken(0x00eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee);
     uint  constant internal PRECISION = (10**18);
     uint constant internal MAX_QTY   = (10**28); // 10B tokens
-    uint constant internal MAX_RATE  = 10**36; // up to 1M tokens per ETH
+    uint constant internal MAX_RATE  = (10**24); // up to 1M tokens per ETH
     uint constant internal MAX_DECIMALS = 18;
-    uint constant internal RATE_PRECISION = MAX_DECIMALS / 2;
     // uint  constant internal ETH_DECIMALS = 18;
     uint constant internal WAD_BPS = (10**22);
     mapping(address=>uint) internal decimals;
@@ -81,21 +80,18 @@ contract Base
         require(dstQty <= MAX_QTY);
         require(rate <= MAX_RATE);
         
-        //source quantity is rounded up. to avoid dest quantity being too low.
         uint numerator;
         uint denominator;
         if (srcDecimals >= dstDecimals) {
-            require(srcDecimals - dstDecimals <= MAX_DECIMALS);
-            numerator = mul(dstQty, (10**(srcDecimals - dstDecimals)));
-            denominator = mul(rate, (10**(RATE_PRECISION + srcDecimals - dstDecimals)));
-            return wdiv(numerator, denominator);
+            require((srcDecimals - dstDecimals) <= MAX_DECIMALS);
+            numerator = (PRECISION * dstQty * (10**(srcDecimals - dstDecimals)));
+            denominator = rate;
         } else {
-            require(dstDecimals - srcDecimals <= MAX_DECIMALS);
-            numerator = mul(dstQty, 10**(dstDecimals - srcDecimals));
-            denominator = mul(rate, (10**(dstDecimals - srcDecimals + RATE_PRECISION)));
-            return wdiv(numerator, denominator);
+            require((dstDecimals - srcDecimals) <= MAX_DECIMALS);
+            numerator = (PRECISION * dstQty);
+            denominator = (rate * (10**(dstDecimals - srcDecimals)));
         }
-        // return (numerator + denominator - 1) / denominator; //avoid rounding down errors
+        return (numerator + denominator - 1) / denominator; //avoid rounding down errors
     }
 
     function getDecimalsSafe(DSToken token) public returns(uint) 
@@ -107,11 +103,23 @@ contract Base
         return decimals[token];
     }
 
-    function calcWadRate(uint srcAmnt, uint destAmnt) public pure returns(uint rate)
+    function calcWadRate(uint srcAmount, uint srcDecimals, uint destAmount, uint dstDecimals) public pure returns(uint rate)
     {
-        // require(srcDecimals % 2 == 0);
-        // uint precision = srcDecimals / 2;
-        rate = add(mul(destAmnt, 10 ** RATE_PRECISION), srcAmnt -1) / srcAmnt;
-        require(rate > 0 && rate < MAX_RATE, "incorrect rate!");
+
+        require(srcAmount <= MAX_QTY);
+        require(destAmount <= MAX_QTY);
+        uint x;
+        uint y;
+        if (dstDecimals >= srcDecimals) {
+            require((dstDecimals - srcDecimals) <= MAX_DECIMALS);
+            x = destAmount * PRECISION;
+            y = ((10 ** (dstDecimals - srcDecimals)) * srcAmount);
+            return  (x + y-1)/ y ;
+        } else {
+            require((srcDecimals - dstDecimals) <= MAX_DECIMALS);
+            x = destAmount * PRECISION * (10 ** (srcDecimals - dstDecimals));
+            y = srcAmount ;
+            return (x + y-1) / y;
+        }
     }
 }

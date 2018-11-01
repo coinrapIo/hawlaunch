@@ -86,8 +86,10 @@ contract OfferData is OfferInterface, Base, DSAuth
 
     function check_rate_and_qty(DSToken src, uint src_amnt, DSToken dest, uint dest_amnt) internal returns(bool)
     {
-        uint rate = calcWadRate(src_amnt, dest_amnt);
-        require(src_amnt == calcSrcQty(dest_amnt, getDecimalsSafe(src), getDecimalsSafe(dest), rate));
+        uint srcDecimals = getDecimalsSafe(src);
+        uint dstDecimals = getDecimalsSafe(dest);
+        uint rate = calcWadRate(src_amnt,srcDecimals, dest_amnt,dstDecimals);
+        require(src_amnt == calcSrcQty(dest_amnt, srcDecimals, dstDecimals, rate));
         return true;
     }
 

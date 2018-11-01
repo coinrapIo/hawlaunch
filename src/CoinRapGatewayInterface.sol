@@ -15,7 +15,7 @@ interface CoinRapGatewayInterface
     function make(DSToken src, uint src_amnt, DSToken dest, uint dest_amnt, uint rng_min, uint rng_max, uint16 code) external payable returns (uint id);
 
     //此处参数名和意义都是maker的视角
-    function take(uint id, DSToken src, DSToken dest, uint dest_amnt,  uint wad_min_rate, uint16 code) external payable returns(uint actual_amnt, uint fee);
+    function take(uint id, DSToken src, DSToken dest, uint dest_amnt,  uint wad_min_rate, uint16 code, uint16 source) external payable returns(uint actual_amnt, uint fee);
     
     function trade(DSToken src, uint src_amnt, DSToken dest, address dest_addr, uint max_dest_amnt, uint min_rate, uint rate100, uint sn, bytes32 code) external payable returns (uint);
 

@@ -112,7 +112,7 @@ contract C2CMktTest is DSTest {
         assertEq(id, startsWith+1);
         assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt);
         assertTrue(crp.approve(address(gateway), 2**255));
-        (take_amnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, _destAmnt, 1000*10**9, _code);
+        (take_amnt, _fee) = gateway.take.value(0)(id, ETH_TOKEN_ADDRESS, crp, _destAmnt, 1000*10**9, _code, 0);
         assertEq(crp.balanceOf(this), initialBalance-user1CrpAmnt-_destAmnt);
         assertEq(address(c2c).balance, _fee);
         c2c.approvedWithdrawAddress(ETH_TOKEN_ADDRESS, fee_wallet,true);
@@ -133,8 +133,8 @@ contract C2CMktTest is DSTest {
         uint _fee = 5 * 10 ** 14;
         uint16 _code = 1234;
 
-        uint rate = c2c.calcWadRate(_src_amnt, _dest_amnt);
-        assertEq(rate, 10**6);
+        uint rate = c2c.calcWadRate(_src_amnt, 18, _dest_amnt, 18);
+        assertEq(rate, 10**15);
 
         crp.approve(address(gateway), 2**255);
         // uint id = gateway.make.value(0)(crp, _src_amnt, ETH_TOKEN_ADDRESS, _dest_amnt, _min, _max, _code);
@@ -143,10 +143,15 @@ contract C2CMktTest is DSTest {
         assertEq(_src_amnt, crp.balanceOf(c2c));
         assertEq(id, startsWith+1);
         
-        (_dest_amnt, _fee) = gateway.take.value(5*10**17)(id, crp, ETH_TOKEN_ADDRESS, 5*10**17, 10**6, _code);
-        assertEq(_dest_amnt, 500*10**18);
-        assertEq(_fee, 0);
-        
+        (_dest_amnt, _fee) = gateway.take.value(7*10**17)(id, crp, ETH_TOKEN_ADDRESS, 7*10**17, 10**15, _code, 0);
+        assertEq(1000 * 10 ** 18 - _dest_amnt, crp.balanceOf(c2c));
+        assertEq(_dest_amnt, 700*10**18);
+        assertEq(_fee, 2*10**14);
+
+        (_dest_amnt, _fee) = gateway.take.value(3*10**17)(id, crp, ETH_TOKEN_ADDRESS, 3*10**17, 10**15, _code, 0);
+        assertEq(0, crp.balanceOf(c2c));
+        assertEq(_dest_amnt, 300*10**18);
+        assertEq(_fee, 3*10**14);
 
     }
 

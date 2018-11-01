@@ -30,7 +30,8 @@ contract EventfulMarket{
         uint            srcAmnt,
         uint            destAmnt,
         uint            fee,
-        uint64          timestamp
+        uint64          timestamp,
+        uint16          source
     );
 
     event LogKill(
@@ -180,10 +181,10 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         emit LogKill(id, pair, msg.sender, src, dest, srcAmnt, destAmnt, uint64(block.timestamp));
     }
 
-    function _logTake(uint id, DSToken src, DSToken dest, address maker, address taker, uint actual_amnt, uint dest_amnt, uint fee) internal
+    function _logTake(uint id, DSToken src, DSToken dest, address maker, address taker, uint actual_amnt, uint dest_amnt, uint fee, uint16 source) internal
     {
         bytes32 pair = keccak256(abi.encodePacked(src, dest));
-        emit LogTake(id, pair, maker, src, dest, taker, actual_amnt, dest_amnt, fee, uint64(block.timestamp));
+        emit LogTake(id, pair, maker, src, dest, taker, actual_amnt, dest_amnt, fee, uint64(block.timestamp), source);
     }
 
     function _takeOffer(address taker, uint id, DSToken src, DSToken tkDstTkn, uint amnt, uint srcAmnt, address owner) 
@@ -232,42 +233,49 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
             require(msg.value - srcAmnt == prepay, "argument value incorrect.(srcAmnt, prepay)");
         }
          
-        uint rate = calcWadRate(srcAmnt, destAmnt);
+        uint rate = calcWadRate(srcAmnt, src_decimals, destAmnt, dest_decimals);
         require(srcAmnt == calcSrcQty(destAmnt, src_decimals, dest_decimals, rate));
         id = _makeOffer(maker, src, srcAmnt, dest, destAmnt, rngMin, rngMax, code, prepay);
     }
 
-    function take(address taker, uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate) 
+    function take(address taker, uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate, uint16 source) 
         public payable returns (uint actualAmnt, uint fee)
     {
         // TODO: 用于单元测试时，需要注释掉．
-        // require(msg.sender == gateway_cntrt);
+        require(msg.sender == gateway_cntrt);
         require((tkDstTkn == ETH_TOKEN_ADDRESS || msg.value == 0), "The token of pay for or amount incorrect.");
-        address maker;
-        DSToken src;
-        uint amnt;
-        uint srcAmnt;
-        (src, maker, amnt, srcAmnt) = check_take(id, tkDstTkn, destAmnt, wad_min_rate);
+        MyOfferInfo memory offer;
+        offer = check_take(id, tkDstTkn, destAmnt, wad_min_rate);
 
-        (actualAmnt, fee) = _takeOffer(taker, id, src, tkDstTkn, amnt, srcAmnt, maker);
+        (actualAmnt, fee) = _takeOffer(taker, id, offer.src, tkDstTkn, destAmnt, offer.srcAmnt, offer.owner);
 
-        _logTake(id, src, tkDstTkn, maker, taker, actualAmnt, destAmnt, fee);
+        _logTake(id, offer.src, tkDstTkn, offer.owner, taker, actualAmnt, destAmnt, fee, source);
     }
 
-    function check_take(uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate) internal returns(DSToken src, address maker, uint amnt, uint srcAmnt)
+    function check_take(uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate) internal returns(MyOfferInfo offer)
     {
-        // DSToken src;
+        DSToken src;
         uint src_amnt;
         uint dest_amnt;
-        // address maker;
+        address maker;
         (src, src_amnt, ,dest_amnt, maker , , , , ,) = offer_data.getOffer(id);
-        // (src, srcAmnt, dest, destAmnt, owner, , , , prepay, , , , ) = offer_data.getOffer(id);
-        amnt = (tkDstTkn == ETH_TOKEN_ADDRESS) ? msg.value : destAmnt;
+        offer.src = src;
+        offer.destAmnt = dest_amnt;
+        offer.owner = maker;
+        // offer.srcAmnt = src_amnt;
+        uint amnt = (tkDstTkn == ETH_TOKEN_ADDRESS) ? msg.value : destAmnt;
         // rate settings by offer owner.
-        uint rate = calcWadRate(src_amnt, dest_amnt); 
+        uint srcDecimals = getDecimalsSafe(src);
+        uint dstDecimals = getDecimalsSafe(tkDstTkn);
+        uint rate = calcWadRate(src_amnt,srcDecimals, dest_amnt, dstDecimals); 
         require(wad_min_rate <= rate, "the rate(taker expect) too high");
-        srcAmnt = calcSrcQty(amnt, getDecimalsSafe(src), getDecimalsSafe(tkDstTkn), rate);
+        uint srcAmnt = calcSrcQty(amnt, srcDecimals, dstDecimals, rate);
         require(srcAmnt > 0 && srcAmnt <= getBalance(src, this), "rate settings incorrect or contract balance insufficient");
+        if (destAmnt >= dest_amnt){
+            //avoid some dust leave in offer(maker's src token)
+            srcAmnt = src_amnt;
+        }
+        offer.srcAmnt = srcAmnt;
     }
 
 

@@ -150,7 +150,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
     }
 
     //此处参数名和意义都是maker的视角
-    function take(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code) 
+    function take(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code, uint16 source) 
         public payable returns(uint actual_amnt, uint fee)
     {
         address o_owner = validate_take_input(id, src, dest, dest_amnt, wad_min_rate, code);
@@ -173,7 +173,8 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
             before.taker.destBalance = add(before.taker.destBalance, msg.value);
         }
 
-        (actual_amnt, fee) = c2c.take.value(msg.value)(msg.sender, id, dest, dest_amnt, wad_min_rate);
+        (actual_amnt, fee) = c2c.take.value(msg.value)(msg.sender, id, dest, dest_amnt, wad_min_rate, source);
+        // emit LogBalance(msg.sender, before.cntrt.srcBalance, before.maker.destBalance, before.taker.srcBalance, before.taker.destBalance);
         
         CheckBalance memory aft;
         aft.cntrt.srcBalance = getBalance(src, c2c);
