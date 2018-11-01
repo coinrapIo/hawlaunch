@@ -5,6 +5,7 @@ import "ds-auth/auth.sol";
 import "./CoinRapGatewayInterface.sol";
 import "./C2CMkt.sol";
 import "./SwapMkt.sol";
+import "./Offer.sol";
 import "./Base.sol";
 
 contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
@@ -37,9 +38,11 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
 
     C2CMkt public c2c;
     SwapMkt public swap;
+    OfferData public offer_data;
 
     event reset_c2c(address curr, address old);
     event reset_swap(address curr, address old);
+    event reset_offer_data(address curr, address old);
 
     constructor() DSAuth() public
     {
@@ -57,6 +60,13 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         require(swap_mkt != address(0x00), "c2c interface is null");
         emit reset_swap(swap_mkt, swap);
         swap = swap_mkt;
+    }
+
+    function set_offer_data(OfferData _offer_data) public auth
+    {
+        require(_offer_data != address(0x00));
+        emit reset_offer_data(_offer_data, offer_data);
+        offer_data = _offer_data;
     }
 
     function max_gas_price() public view returns(uint)
@@ -143,8 +153,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
     function take(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code) 
         public payable returns(uint actual_amnt, uint fee)
     {
-        validate_take_input(id, src, dest, dest_amnt, wad_min_rate, code);
-        address o_owner = c2c.getOwner(id);
+        address o_owner = validate_take_input(id, src, dest, dest_amnt, wad_min_rate, code);
         require(o_owner != msg.sender, "can't take youself offer!");
     
         CheckBalance memory before;
@@ -191,17 +200,18 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
 
     // event LogBalance(address addr, uint before, uint aft, uint amunt, uint fee);
 
-    function validate_take_input(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code) internal view 
+    function validate_take_input(uint id, DSToken src, DSToken dest, uint dest_amnt, uint wad_min_rate, uint16 code) internal view returns(address)
     {
-        require(wad_min_rate >0 && c2c.isActiveOffer(id));
-        
+        require(wad_min_rate >0);
         DSToken o_dest;
         DSToken o_src;
         uint o_dest_amnt;
         address o_owner;
         uint o_min;
         uint o_max;
-        (o_src, ,o_dest, o_dest_amnt, o_owner, o_min, o_max) = c2c.getOffer(id);
+        // (src, srcAmnt , dest, destAmnt, owner, min, max, , , ) = offer_data.getOffer(id);
+        (o_src, ,o_dest, o_dest_amnt, o_owner, o_min, o_max, , , ) = offer_data.getOffer(id);
+        require(o_dest_amnt > 0);
         if (o_dest_amnt < o_min)
         {
             o_min = o_dest_amnt;
@@ -209,6 +219,7 @@ contract CoinRapGateway is CoinRapGatewayInterface, Base, DSAuth
         require(src == o_src && dest == o_dest);
         uint amnt = (dest == ETH_TOKEN_ADDRESS) ? msg.value : dest_amnt;
         require(amnt >= o_min && amnt <= o_max && amnt <= o_dest_amnt);
+        return o_owner;
     }
     
     function trade(

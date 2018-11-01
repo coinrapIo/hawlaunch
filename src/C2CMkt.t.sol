@@ -30,6 +30,7 @@ contract C2CMktTest is DSTest {
 
         gateway = new CoinRapGateway();
         gateway.set_c2c_mkt(c2c);
+        gateway.set_offer_data(offer_data);
         c2c.setCoinRapGateway(gateway);
 
 
@@ -83,8 +84,8 @@ contract C2CMktTest is DSTest {
         // assertTrue(hasCode == (_code > 0));
         // assertTrue(code == _code);
         assertEq(offer_data.getOfferCnt(this), 1);
-        assertTrue(c2c.isActiveOffer(id));
-        assertEq(c2c.getOwner(id), address(this));
+        assertTrue(offer_data.isActive(id));
+        assertEq(offer_data.getOwner(id), address(this));
         // uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code
         c2c.update(id, _destAmnt, _min, _max, 0);
         uint amnt;
@@ -132,7 +133,7 @@ contract C2CMktTest is DSTest {
         uint _fee = 5 * 10 ** 14;
         uint16 _code = 1234;
 
-        uint rate = c2c.calcWadRate(_src_amnt, _dest_amnt, c2c.getDecimalsSafe(crp));
+        uint rate = c2c.calcWadRate(_src_amnt, _dest_amnt);
         assertEq(rate, 10**6);
 
         crp.approve(address(gateway), 2**255);
@@ -161,7 +162,7 @@ contract C2CMktTest is DSTest {
         // uint16 code;
         // bool hasCode;
 
-        (, srcAmnt,  , destAmnt, owner, min, max ) = c2c.getOffer(id);
+        (, srcAmnt,  , destAmnt, owner, min, max, , , ) = offer_data.getOffer(id);
         // assertTrue(src == ETH_TOKEN_ADDRESS);
         // assertTrue(dest == crp);
         assertEq(srcAmnt, _srcAmnt);

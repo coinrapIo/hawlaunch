@@ -70,12 +70,12 @@ kovan:
 
 ```
 dapp create OfferData 1000000 --gas 6000000
-OFFER=0xffec90c95e27c20198cc06725c896462fe418671
+OFFER=0x5e78f5125bb080b20283fb70f160bc888baacfba
 dapp create C2CMkt $OFFER --gas 6000000
 dapp create CoinRapGateway --gas 6000000
 
-C2C=0xde3c994c92593812277e07f6744b5ffaccd0fd78
-GATEWAY=0x35867b69c3e3d9e0c588cb49348c87e0dc5ce545
+C2C=0x98ee49e6c35a229d924edddbaea232d0290c9265
+GATEWAY=0xe35f8f0c2c6cd81fef5d260eae7fb3b95fc3c33e
 
 # set c2c.gateway
 seth send $C2C "setCoinRapGateway(address)" $GATEWAY
@@ -85,11 +85,60 @@ seth send $OFFER 'set_c2c_mkt(address)' $C2C
 # set c2c.listed tokens
 SMT=0xa03D360215C62afD2d324aaBda422B92d78b7684
 seth send $C2C "setToken(address,bool)" $SMT true
+seth send $C2C "setToken(address,bool)" $RAP true
+seth send $C2C "setToken(address,bool)" $T8 true
 
 
 
 # set gateway.c2c
 seth send $GATEWAY "set_c2c_mkt(address)" $C2C
+seth send $GATEWAY "set_offer_data(address)" $OFFER
 
+
+```
+
+mainnet:
+
+```
+dapp create OfferData 1000000 --gas 6000000
+OFFER=0xa57C4C75c0023202D919C6200baaF1A4166f19c4
+dapp create C2CMkt $OFFER --gas 6000000
+
+
+C2C=0x06417ebef8f73a16b050f12aa31d77027f6d49a5
+GATEWAY=0xf7c809fcf18318e7a13866868b9e74a3b532de9d
+seth send $C2C "setCoinRapGateway(address)" $GATEWAY
+seth send $OFFER 'set_c2c_mkt(address)' $C2C
+
+AE=0x5ca9a71b1d01849c0a95490cc00559717fcf0d1d
+SNT=0x744d70fdbe2ba4cf95131626614a1763df805b9e
+OMG=0xd26114cd6EE289AccF82350c8d8487fedB8A0C07
+BNB=0xB8c77482e45F1F44dE1745F52C74426C631bDD52
+LINK=0x514910771af9ca656af840dff83e8264ecf986ca
+KNC=0xdd974d5c2e2928dea5f71b9825b8b646686bd200
+SMT=0x55f93985431fc9304077687a35a1ba103dc1e081
+DAI=0x89d24a6b4ccb1b6faa2625fe562bdd9a23260359
+IOST=0xfa1a856cfa3409cfa145fa4e20eb270df3eb21ab
+ZIL=0x05f4a42e251f2d52b8ed15e9fedaacfcef1fad27
+TUSD=0x8dd5fbce2f6a956c3022ba3663759011dd51e73e
+TAC=0xca694eb79eF355eA0999485d211E68F39aE98493
+GUSD=0x056Fd409E1d7A124BD7017459dFEa2F387b6d5Cd
+
+seth send $C2C "setToken(address,bool)" $AE true
+seth send $C2C "setToken(address,bool)" $SNT true
+seth send $C2C "setToken(address,bool)" $OMG true
+seth send $C2C "setToken(address,bool)" $BNB true
+seth send $C2C "setToken(address,bool)" $LINK true
+seth send $C2C "setToken(address,bool)" $KNC true
+seth send $C2C "setToken(address,bool)" $SMT true
+seth send $C2C "setToken(address,bool)" $DAI true
+seth send $C2C "setToken(address,bool)" $IOST true
+seth send $C2C "setToken(address,bool)" $ZIL true
+seth send $C2C "setToken(address,bool)" $TUSD true
+seth send $C2C "setToken(address,bool)" $TAC true
+seth send $C2C "setToken(address,bool)" $GUSD true
+
+
+seth send $GATEWAY "set_c2c_mkt(address)" $C2C
 
 ```
