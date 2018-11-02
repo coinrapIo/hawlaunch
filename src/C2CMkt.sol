@@ -51,7 +51,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
 
     address public gateway_cntrt;
     uint public currRemit = 5 * 10 ** 17;
-    uint8 public currFeeBps = 10;
+    uint8 public currFeeBps = 20;
     bool public enableMake = true;
 
     OfferInterface offer_data;
@@ -86,6 +86,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         require(isListPair(src, dest) && enableMake, "the tokens are not listed!");
         _;
     }
+
 
     function update(uint id, uint destAmnt, uint rngMin, uint rngMax, uint16 code) public isActive(id) returns(bool)
     {
@@ -238,11 +239,12 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         id = _makeOffer(maker, src, srcAmnt, dest, destAmnt, rngMin, rngMax, code, prepay);
     }
 
-    function take(address taker, uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate, uint16 source) 
+    function take(address taker, uint id, DSToken tkDstTkn, uint destAmnt, uint wad_min_rate, uint16 code, uint16 source) 
         public payable returns (uint actualAmnt, uint fee)
     {
         // TODO: 用于单元测试时，需要注释掉．
         require(msg.sender == gateway_cntrt);
+        require(offer_data.verifyCode(id, code));
         require((tkDstTkn == ETH_TOKEN_ADDRESS || msg.value == 0), "The token of pay for or amount incorrect.");
         MyOfferInfo memory offer;
         offer = check_take(id, tkDstTkn, destAmnt, wad_min_rate);
@@ -347,6 +349,14 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         require(gateway != address(0x00));
         gateway_cntrt = gateway;
     }
+    
+    function set_offer_data(OfferInterface _offer_data) public auth
+    {
+        require(_offer_data != address(0x00));
+        emit reset_offer_data(_offer_data, offer_data);
+        offer_data = _offer_data;
+    }
+    event reset_offer_data(address curr, address old);
 
     event WithdrawAddressApproved(DSToken token, address addr, bool approve);
     function approvedWithdrawAddress(DSToken token, address addr, bool approve) public auth returns(bool)

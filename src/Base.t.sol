@@ -122,6 +122,17 @@ contract BaseTest is DSTest, DSMath {
         assertEq(qty, srcAmnt);
 
 
+        srcAmnt = 10**16;  //0.08 * 10 ** 18
+        destAmnt = 1165 * 10**6; //95.12 * 10**8
+        srcDecimals = 18;
+        destDecimals = 8;
+        expectWadRate = destAmnt * 10 **(18+srcDecimals-destDecimals) / srcAmnt;
+        rate = base.calcWadRate(srcAmnt,18, destAmnt, 8);
+        assertEq(rate, expectWadRate);
+        qty = base.calcSrcQty(destAmnt, 18, 8, rate);
+        assertEq(qty, srcAmnt);
+
+
 
         uint8 v = 28;
         // bytes32 h = 0x1476abb745d423bf09273f1afd887d951181d25adc66c4834a70491911b7f750;

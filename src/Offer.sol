@@ -74,8 +74,8 @@ contract OfferData is OfferInterface, Base, DSAuth
         dest = offer.dest;
         dest_amnt = offer.destAmnt;
         owner = offer.owner;
-        min = offer.rngMin > 0 ? offer.rngMin : offer.destAmnt;
-        max = offer.rngMax > 0 ? offer.rngMax : offer.destAmnt;
+        min = offer.rngMin > 0 && offer.destAmnt > offer.rngMin ? offer.rngMin : offer.destAmnt;
+        max = offer.rngMax > 0 && offer.destAmnt > offer.rngMax ? offer.rngMax : offer.destAmnt;
         has_code = (offer.code>uint16(0));
         prepay = offer.prepay;
         accum_eth = offer.accumTradeAmnt;
@@ -246,7 +246,7 @@ contract OfferData is OfferInterface, Base, DSAuth
                 offers[id].rngMax = 0;
             }
         }
-        if (code > 1000 && offer.code != code)
+        if ((code > 1000 || code == 0) && offer.code != code)
         {
             offers[id].code = code;
         }
@@ -272,6 +272,12 @@ contract OfferData is OfferInterface, Base, DSAuth
         require(_c2c != address(0x00));
         c2c = _c2c;
         emit SetC2CMkt(msg.sender, c2c);
+    }
+
+    function verifyCode(uint id, uint16 code) public view  returns(bool)
+    {
+        require(msg.sender == c2c);
+        return offers[id].code == code;
     }
 
     function getOfferCnt(address owner) public view returns(uint cnt)
