@@ -9,7 +9,7 @@ contract Base
     uint constant internal MAX_QTY   = (10**28); // 10B tokens
     uint constant internal MAX_RATE  = (10**24); // up to 1M tokens per ETH
     uint constant internal MAX_DECIMALS = 18;
-    // uint  constant internal ETH_DECIMALS = 18;
+    
     uint constant internal WAD_BPS = (10**22);
     mapping(address=>uint) internal decimals;
 
@@ -62,19 +62,6 @@ contract Base
         return tokenDecimals;
     }
 
-    // function calcDstQty(uint srcQty, uint srcDecimals, uint dstDecimals, uint rate) internal pure returns(uint) {
-    //     require(srcQty <= MAX_QTY);
-    //     require(rate <= MAX_RATE);
-
-    //     if (dstDecimals >= srcDecimals) {
-    //         require((dstDecimals - srcDecimals) <= MAX_DECIMALS);
-    //         return (srcQty * rate * (10**(dstDecimals - srcDecimals))) / MAX_DECIMALS;
-    //     } else {
-    //         require((srcDecimals - dstDecimals) <= MAX_DECIMALS);
-    //         return (srcQty * rate) / (MAX_DECIMALS * (10**(srcDecimals - dstDecimals)));
-    //     }
-    // }
-
     function calcSrcQty(uint dstQty, uint srcDecimals, uint dstDecimals, uint rate) public pure returns(uint) 
     {
         require(dstQty <= MAX_QTY);
@@ -105,7 +92,6 @@ contract Base
 
     function calcWadRate(uint srcAmount, uint srcDecimals, uint destAmount, uint dstDecimals) public pure returns(uint rate)
     {
-
         require(srcAmount <= MAX_QTY);
         require(destAmount <= MAX_QTY);
         uint x;

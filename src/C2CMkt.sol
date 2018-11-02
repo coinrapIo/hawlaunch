@@ -221,7 +221,7 @@ contract C2CMkt is EventfulMarket, Base, DSAuth
         public canMake(src, dest) payable returns (uint id)
     {
         // TODO: 用于单元测试时，需要注释掉．
-        // require(msg.sender == gateway_cntrt);
+        require(msg.sender == gateway_cntrt);
         require((code>=0 && code < 9999), "incorrect code argument.");
         
         uint src_decimals = getDecimalsSafe(src);
